@@ -4,60 +4,51 @@
 
 ## Komponenten
 
-| Datei | Verantwortung |
+| Datei / Modul | Verantwortung |
 | --- | --- |
-| `cli.py` | Argumente, Konfigurationsdatei, Pairing, Leuchtenauswahl und MCP-Werkzeugregistrierung |
+| `cli.py` | Argumente, Konfigurationsdatei, Pairing, Leuchtenauswahl, Hook- und Setup-Handler |
 | `bridge.py` | HTTPS-/JSON-Adapter für Hue v2, Zustandssicherung, Farbmischung und Signalausführung |
 | `locking.py` | Dateibasierte Betriebssystem-Sperre für konkurrierende lokale Prozesse |
-| `__main__.py` | Start über `python -m hue_task_mcp` |
+| `__main__.py` | Start über `python -m hue_agent_feedback` |
 | `tests/test_indicator.py` | Asynchrone Tests mit simuliertem Bridge-Adapter |
+| `tests/test_cli.py` | Unit-Tests für Lifecycle Hooks, Stdin-Handling und Setup |
 
 ```mermaid
 flowchart LR
-    A[Agent und geladene Regeln] -->|MCP stdio oder HTTP| B[cli.py / MCPServer]
-    B --> C[Lokale Konfiguration]
+    A[Agent Lifecycle Events\nStop / PreToolUse] -->|CLI Hook Execution| B[cli.py / run_hook]
+    B --> C[Lokale Konfiguration\nhue.local.json]
     B --> D[Indicator und Dateisperre]
     D --> E[Bridge-Adapter / HTTPS]
     E --> F[Hue Bridge]
     F --> G[Konfigurierte Farbleuchte]
 ```
 
-Der Agent erkennt den Aufgabenstatus und entscheidet über den Werkzeugaufruf. Der Server überwacht keine Fenster, Tastatureingaben, Chat-Inhalte oder Prozesse. Eine Benachrichtigung über einen tatsächlichen Client-Lifecycle-Hook wäre eine zusätzliche Integration außerhalb dieses Projekts.
+Lifecycle-Events wie `Stop` (Aufgabe fertig) und `PreToolUse` (Rückfrage via `ask_question`) werden auf Systemebene über `hooks.json` abgefangen. Die Ausführung erfolgt vollständig deterministisch und entlastet das Modell von Prompt-Regeln und Token-Aufwand.
 
 ## Aufrufablauf
 
-1. Die lokale Konfiguration bei jedem MCP-Aufruf neu laden.
+1. Die lokale Konfiguration bei jedem Hook-/Signal-Aufruf laden.
 2. Einen Bridge-Adapter erstellen und die konfigurierte Adresse prüfen.
-3. Eine Betriebssystem-Dateisperre für den Konfigurationspfad erwerben.
-4. Den aktuellen Zustand der Ziel-Leuchte lesen.
+3. Den aktuellen Zustand der Ziel-Leuchte lesen.
+4. **Ausgeschaltete Leuchten sofort überspringen:** Ist das Licht aus (`on: false`), wird die Ausführung sofort beendet, ohne einen Schreibbefehl an die Bridge zu senden.
 5. Ungeeignete Leuchten, Streaming-Modus und aktive dynamische Szenen ablehnen.
-6. Wiederherstellbare Felder sichern; bei ausgeschaltetem Licht ohne Schreibzugriff beenden.
-7. Ziel-Farbkoordinaten in die aktuellen Koordinaten mischen. Bestehende Gradient-Punkte einzeln behandeln. Die Benachrichtigungs-Payload verändert keine Helligkeit und schaltet die Leuchte nicht ein oder aus.
-8. Zwei Übergänge zum gemischten Zustand mit jeweils anschließender Rückkehr ausführen.
-9. Im `finally`-Block erneut den gesicherten Zustand schreiben und erst nach Abschluss die Sperre freigeben.
-
-Ohne Fehler sind das ein Light-GET und fünf Light-PUTs. Die Sequenz dauert mindestens ungefähr 5,6 s zuzüglich Requests und möglicher Sperrwartezeit. Es gibt keine dauerhafte Queue, Ereignis-ID oder Duplikaterkennung. Jeder Aufruf erzeugt sein eigenes Signal; gleichzeitige Anfragen werden serialisiert.
+6. Eine Betriebssystem-Dateisperre für den Konfigurationspfad erwerben.
+7. Wiederherstellbare Felder sichern (Ausgangsfarbe, Gradientenpunkte, Farbtemperatur, Effekte).
+8. Ziel-Farbkoordinaten in die aktuellen Koordinaten mischen (22 % Standard). Die Benachrichtigungs-Payload verändert keine Helligkeit und schaltet die Leuchte nicht ein oder aus.
+9. Zwei Übergänge zum gemischten Zustand mit jeweils anschließender Rückkehr ausführen.
+10. Im `finally`-Block erneut den gesicherten Zustand schreiben und erst nach Abschluss die Sperre freigeben.
+11. Für Antigravity Lifecycle Hooks: Valides JSON `{"decision": "allow"}` auf `stdout` ausgeben.
 
 ## Zustandssicherung
 
 Gesichert werden Einschaltzustand, Helligkeit, gültige Weißtemperatur oder alternativ xy-Farbe, vorhandene Gradient-Punkte samt Modus sowie ein aktiver einfacher Effekt. Read-only-Felder wie Farbgamut oder `points_capable` werden nicht zurückgeschrieben.
 
-Während einer Benachrichtigung wird ein gemeldeter einfacher Effekt auf `no_effect` gesetzt und bei vorher aktivem Effekt später wieder aktiviert. Erweiterte Effektparameter und dynamische Szenen werden nicht vollständig rekonstruiert. Eine Farbausgabe außerhalb des Leuchtengamuts wird nicht selbst auf den Gamut projiziert; die Darstellung hängt von der Bridge/Leuchte ab.
+Während einer Benachrichtigung wird ein gemeldeter einfacher Effekt auf `no_effect` gesetzt und bei vorher aktivem Effekt später wieder aktiviert. Erweiterte Effektparameter und dynamische Szenen werden nicht vollständig rekonstruiert.
 
 ## Fehler und Abbruch
 
-Bridge-Requests laufen über `asyncio.to_thread`, damit die synchrone Standardbibliothek nicht direkt die Eventloop blockiert. Ein Abbruch des wartenden Tasks beendet nicht zwingend einen bereits laufenden Netzwerk-Thread. Die abschließende Wiederherstellung ist mit `asyncio.shield` gegen gewöhnliche Task-Cancellation geschützt. Ein harter Prozessabbruch, erneuter Abbruch während der Bereinigung oder Stromausfall ist dadurch nicht abgesichert.
-
-Die Sicherung wird bei `RuntimeError` bis zu dreimal versucht. Ein endgültiger Wiederherstellungsfehler kann den vorherigen Fehler überdecken. Es gibt kein dauerhaftes Wiederherstellungsjournal und keine nachträgliche Reparatur nach Prozessneustart.
+Bridge-Requests laufen über `asyncio.to_thread`, damit die synchrone Standardbibliothek nicht direkt die Eventloop blockiert. Die abschließende Wiederherstellung ist mit `asyncio.shield` gegen gewöhnliche Task-Cancellation geschützt. Tritt ein Kommunikationsfehler auf, fängt der Hook-Handler diesen ab und gibt dennoch `{"decision": "allow"}` an Antigravity zurück, damit die Ausführung des Benutzers niemals blockiert wird.
 
 ## Sperrverhalten
 
 Aus dem Konfigurationspfad wird mit `with_suffix('.lock')` der Sperrpfad gebildet: `hue.local.json` wird zu `hue.local.lock`. Windows nutzt `msvcrt.locking`, POSIX `fcntl.flock`. Die Datei bleibt als normaler Marker liegen; die aktive Sperre hängt am offenen Dateihandle.
-
-Für mehrere Clients **denselben absoluten Konfigurationspfad** verwenden. Getrennte Dateien mit derselben Light-UUID erzeugen getrennte Sperren und können sich gegenseitig überschreiben. Die Synchronisierung gilt für lokale Prozesse mit kompatibler Dateisperre, nicht für beliebige Hosts oder Netzlaufwerke.
-
-## Transport
-
-Die offizielle MCP-Python-SDK stellt stdio und stateless Streamable HTTP bereit. Der HTTP-Modus verwendet JSON-Antworten und bindet ausschließlich an Loopback. Pairing und Lichtänderungen werden nicht als eigene HTTP-REST-Endpunkte angeboten; über HTTP sind dieselben drei MCP-Werkzeuge erreichbar.
-
-Zugang zu ChatGPT aus dem Browser ist eine separate Tunnel-/Authentifizierungsaufgabe. Kein öffentlicher Reverse Proxy und kein OAuth-Server werden durch dieses Projekt eingerichtet.

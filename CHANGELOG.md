@@ -1,24 +1,20 @@
 # Änderungsverlauf
 
-## Unreleased
+## 0.2.0 — HueAgentFeedback (Lifecycle Hooks)
 
-- Antigravity CLI Lifecycle Hooks (`hook` und `setup` Unterbefehle) nach dem Vorbild von Tiny Engineer implementiert.
-- Deterministische Signale auf Systemebene: `Stop` (Aufgabe beendet -> Blau) und `PreToolUse: ask_question` (Rückfrage -> Rot) ganz ohne Prompt-Regeln oder Tokenverbrauch.
-- Vollautomatisches Setup via `python -m hue_task_mcp setup [--global]`.
-- Ausgeschaltete Leuchten werden sofort übersprungen und bleiben garantiert aus.
-- Umfassende Unit-Tests für Hooks und Setup in `tests/test_cli.py`.
-- Vollständige deutsche Einrichtungsanleitung für neue Nutzer ergänzt.
-- Codex-, Antigravity- und Linux/macOS-Konfigurationsvorlagen sowie eine Konfiguration mit Platzhaltern ergänzt.
-- CLI-/MCP-Referenz, Architektur, Sicherheitsmodell, Fehlerhilfe und Entwicklungsanleitung hinzugefügt.
-- Optionales Publish-Skript: GitHub-Benutzername ist nicht mehr fest eingebaut; Dokumentation wird beim Staging berücksichtigt.
-- README in die Python-Paketbeschreibung aufgenommen.
+- Projekt umbenannt in **HueAgentFeedback** (`hue-agent-feedback`).
+- Umstellung auf reine **Lifecycle Hooks** (Antigravity CLI, Claude Code, Cursor) ohne MCP-Server-Overhead.
+- Vollständige Entfernung externer Bibliotheken (**Zero Dependencies** — 100 % Python-Standardbibliothek).
+- Antigravity CLI Lifecycle Hooks (`hook Stop` -> Blau, `hook PreToolUse: ask_question` -> Rot).
+- Vollautomatisches Setup via `hue-agent-feedback setup [--global]`.
+- Neuer Befehl `hue-agent-feedback status` zum Auslesen des Lampenzustands.
+- Ausgeschaltete Leuchten werden sofort erkannt und bleiben garantiert aus.
+- Umfassende Unit-Tests für Hooks, Status und Setup (`tests/test_cli.py`).
+- Detaillierte Dokumentation für Antigravity CLI, Claude Code, Cursor und CLI-Agenten.
 
 ## 0.1.0 — ursprüngliche lokale Implementierung
 
-- Hue-Bridge-Pairing, Leuchtenauswahl und drei MCP-Werkzeuge.
+- Hue-Bridge-Pairing, Leuchtenauswahl und MCP-Werkzeuge.
 - Zwei sanfte blaue/rote Farbmischungen bei unveränderter Helligkeit.
 - Gradient-Punkte, lokale Prozesssperren und bestmögliche Zustandswiederherstellung.
-- stdio und lokales Streamable HTTP.
 - Asynchrone Tests und CI-Definition für Windows/Linux.
-
-Die Versionsnummer beschreibt den Quellstand; es wird damit keine Veröffentlichung auf PyPI oder eine GitHub-Release behauptet.

@@ -19,7 +19,7 @@ Erst wenn ein Schritt funktioniert, zur nächsten Ebene wechseln. Kopplung ist n
 | Symptom | Ursache / Lösung |
 | --- | --- |
 | Python wird nicht gefunden oder ist zu alt | Python 3.11+ installieren; `python --version` prüfen. Gegebenenfalls den Windows-Python-Launcher verwenden. |
-| `No module named mcp` oder `hue_task_mcp` | Den richtigen venv-Interpreter benutzen und `-m pip install -e .` erneut ausführen. |
+| `No module named hue_agent_feedback` | Den richtigen venv-Interpreter benutzen und `-m pip install -e .` erneut ausführen. |
 | `discover` liefert nichts | Bridge-IP aus Hue-App/Router verwenden. Discovery benötigt Internet und ist keine lokale Netzwerksuche. |
 | Pairing läuft ab | Taste während des wartenden Befehls drücken; IP, Bridge-Zugang und lokale Firewall prüfen. |
 | `Not paired yet` | Die vom Prozess geladene Konfigurationsdatei fehlt. `cwd`, `--config` und `HUE_TASK_CONFIG` vergleichen. |

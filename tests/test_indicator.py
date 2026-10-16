@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from hue_task_mcp.bridge import Indicator, restore_state
+from hue_agent_feedback.bridge import Indicator, restore_state
 
 LIGHT = {"id": "3b6e747a-d4ff-49cc-8180-cf345819d3f5", "on": {"on": True},
          "dimming": {"brightness": 38}, "color": {"xy": {"x": 0.4, "y": 0.3}},

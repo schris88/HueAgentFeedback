@@ -1,3 +1,4 @@
-from .cli import main
+from hue_agent_feedback.cli import main
 
-main()
+if __name__ == "__main__":
+    main()

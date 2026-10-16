@@ -4,11 +4,11 @@
 
 ## Berechtigungen und Datenfluss
 
-Der Pairing-Befehl registriert nach einem physischen Tastendruck eine eigene Anwendung bei der Hue Bridge. Der resultierende Schlüssel erlaubt Bridge-weite Steuerung. Hue beschränkt diesen Schlüssel nicht auf eine einzelne Leuchte. Die drei MCP-Werkzeuge wählen ausschließlich das lokal konfigurierte Licht; bei Änderung des Codes oder Diebstahl des Schlüssels gilt diese Beschränkung nicht.
+Der Pairing-Befehl registriert nach einem physischen Tastendruck eine eigene Anwendung bei der Hue Bridge. Der resultierende Schlüssel erlaubt Bridge-weite Steuerung. Hue beschränkt diesen Schlüssel nicht auf eine einzelne Leuchte. Die Anwendung steuert ausschließlich das lokal konfigurierte Licht; bei Änderung des Codes oder Diebstahl des Schlüssels gilt diese Beschränkung nicht.
 
 Die Bridge-IP, der Schlüssel und die Ziel-UUID werden lokal gespeichert. Normale Bridge-Requests senden den Schlüssel im Header `hue-application-key` über HTTPS an die konfigurierte Bridge, nicht in einem URL-Pfad. Die automatische Suche ruft `discovery.meethue.com` auf. Python-Paketinstallation greift auf Paketquellen zu. Das optionale Publish-Skript greift nur bei Ausführung auf GitHub zu.
 
-Es gibt keine eingebaute Telemetrie, Chat-Aufzeichnung oder Screenshot-Erfassung. MCP-Clients und ein eventuell genutzter Tunnel haben eigene Daten-/Protokollierungsregeln. `light_status` gibt den Leuchtennamen, Status und Fähigkeiten an den Client weiter, aber keine Bridge-Anmeldedaten.
+Es gibt keine eingebaute Telemetrie, Chat-Aufzeichnung oder Screenshot-Erfassung. `status` gibt den Leuchtennamen, Status und Fähigkeiten auf `stdout` aus, aber keine Bridge-Anmeldedaten.
 
 ## Lokale Dateien
 
@@ -26,11 +26,9 @@ Optional `ca_file` auf ein geeignetes vertrauenswürdiges Bundle setzen. Dann nu
 
 Keine globale TLS-Einstellung wird verändert. Adressen werden mit `ipaddress` auf eine private IPv4-Adresse geprüft. Dies ist keine zusätzliche Firewall und kein Schutz gegen unbefugte Änderungen der lokalen Konfiguration.
 
-## MCP- und HTTP-Zugriff
+## Lokale Schnittstelle
 
-stdio ist für lokale Clients vorgesehen. Der HTTP-Modus bindet nur an `127.0.0.1`; er implementiert keinen eigenen Login, API-Token oder OAuth-Server. Andere lokale Prozesse können einen erreichbaren Loopback-Dienst ansprechen. Er gehört nicht direkt ins öffentliche Internet.
-
-Eine private ChatGPT-Verbindung kann über den offiziellen Secure MCP Tunnel hergestellt werden. Der Tunnel und die zugehörigen Kontoberechtigungen müssen separat eingerichtet werden. Einen öffentlichen Zugang erst mit geeigneter Authentifizierung, TLS, Zugriffsregeln und passender MCP-Konfiguration betreiben; dies ist keine mitgelieferte Deployment-Variante.
+Die Steuerung erfolgt lokal über CLI-Befehle (`hue-agent-feedback signal done|question` bzw. `hook Stop|PreToolUse`). Es wird kein lokaler Server-Port geöffnet und kein Netzwerk-Socket exponiert. Die Kommunikation beschränkt sich ausschließlich auf HTTPS-Requests an die lokale Hue Bridge.
 
 ## Betrieb und Widerruf
 

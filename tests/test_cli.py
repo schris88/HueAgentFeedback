@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch, AsyncMock
 
-from hue_task_mcp.cli import generate_hook_config, run_setup, run_hook
+from hue_agent_feedback.cli import generate_hook_config, run_setup, run_hook
 
 
 class HookCliTests(unittest.TestCase):
@@ -42,7 +42,7 @@ class HookCliTests(unittest.TestCase):
         run_setup(ArgsInstall)
         self.assertTrue(target.exists())
         data = json.loads(target.read_text(encoding="utf-8"))
-        self.assertIn("hue-task", data)
+        self.assertIn("hue-agent-feedback", data)
 
         # Uninstall
         class ArgsUninstall:
@@ -53,7 +53,7 @@ class HookCliTests(unittest.TestCase):
 
         run_setup(ArgsUninstall)
         data = json.loads(target.read_text(encoding="utf-8"))
-        self.assertNotIn("hue-task", data)
+        self.assertNotIn("hue-agent-feedback", data)
 
 
 class RunHookTests(unittest.IsolatedAsyncioTestCase):
@@ -62,9 +62,9 @@ class RunHookTests(unittest.IsolatedAsyncioTestCase):
             event = "Stop"
             config = Path("hue.local.json")
 
-        with patch("hue_task_mcp.cli.Bridge") as mock_bridge, \
-             patch("hue_task_mcp.cli.Indicator") as mock_indicator, \
-             patch("hue_task_mcp.cli.load_config", return_value={"light_id": "123"}), \
+        with patch("hue_agent_feedback.cli.Bridge") as mock_bridge, \
+             patch("hue_agent_feedback.cli.Indicator") as mock_indicator, \
+             patch("hue_agent_feedback.cli.load_config", return_value={"light_id": "123"}), \
              patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
             mock_inst = AsyncMock()
             mock_indicator.return_value = mock_inst
@@ -81,9 +81,9 @@ class RunHookTests(unittest.IsolatedAsyncioTestCase):
             config = Path("hue.local.json")
 
         payload = {"toolCall": {"name": "ask_question", "args": {}}}
-        with patch("hue_task_mcp.cli.Bridge") as mock_bridge, \
-             patch("hue_task_mcp.cli.Indicator") as mock_indicator, \
-             patch("hue_task_mcp.cli.load_config", return_value={"light_id": "123"}), \
+        with patch("hue_agent_feedback.cli.Bridge") as mock_bridge, \
+             patch("hue_agent_feedback.cli.Indicator") as mock_indicator, \
+             patch("hue_agent_feedback.cli.load_config", return_value={"light_id": "123"}), \
              patch("sys.stdin", io.StringIO(json.dumps(payload))), \
              patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
             mock_inst = AsyncMock()

@@ -9,17 +9,17 @@ Standard: `hue.local.json` eine Ebene über dem Python-Paket. Bei der empfohlene
 Priorität: explizites `--config PATH`, sonst Umgebungsvariable `HUE_TASK_CONFIG`, sonst Standardpfad. Relative Pfade beziehen sich auf das Arbeitsverzeichnis des Prozesses. Für MCP-Clients sind absolute Pfade am zuverlässigsten.
 
 ```powershell
-.\.venv\Scripts\python.exe -m hue_task_mcp --config C:/HueConfig/hue.local.json pair --bridge 192.168.1.20
-.\.venv\Scripts\python.exe -m hue_task_mcp --config C:/HueConfig/hue.local.json lights
-.\.venv\Scripts\python.exe -m hue_task_mcp --config C:/HueConfig/hue.local.json select LIGHT_UUID
-.\.venv\Scripts\python.exe -m hue_task_mcp --config C:/HueConfig/hue.local.json serve
+hue-agent-feedback --config C:/HueConfig/hue.local.json pair --bridge 192.168.1.20
+hue-agent-feedback --config C:/HueConfig/hue.local.json lights
+hue-agent-feedback --config C:/HueConfig/hue.local.json select LIGHT_UUID
+hue-agent-feedback --config C:/HueConfig/hue.local.json status
 ```
 
 `--config` ist ein globales Argument und muss **vor dem Unterbefehl** stehen. Alternativ:
 
 ```powershell
-$env:HUE_TASK_CONFIG = 'C:/HueConfig/hue.local.json'
-.\.venv\Scripts\python.exe -m hue_task_mcp serve
+$env:HUE_AGENT_FEEDBACK_CONFIG = 'C:/HueConfig/hue.local.json'
+hue-agent-feedback status
 ```
 
 | Feld | Pflicht | Bedeutung |
@@ -32,11 +32,11 @@ $env:HUE_TASK_CONFIG = 'C:/HueConfig/hue.local.json'
 
 Vorlage: [hue.example.json](../examples/hue.example.json). Nur Beispielwerte sind dort enthalten. Unbekannte Felder werden nicht als Schemafehler zurückgewiesen, bewirken aber nichts. `color_mix` wird beim Signal geprüft, nicht beim Laden.
 
-`pair` schreibt eine neue Konfiguration. Bei gleicher Bridge-IP wird eine vorhandene `light_id` übernommen. Optionale Felder wie `color_mix` und `ca_file` werden nicht übernommen. Ein Serverneustart ist für Dateianpassungen nicht nötig, da jedes MCP-Werkzeug die Datei neu lädt.
+`pair` schreibt eine neue Konfiguration. Bei gleicher Bridge-IP wird eine vorhandene `light_id` übernommen. Optionale Felder wie `color_mix` und `ca_file` werden nicht übernommen.
 
 ## CLI
 
-Aufruf: `python -m hue_task_mcp [--config PATH] BEFEHL`. Nach der Paketinstallation ist auch `hue-task-mcp` als Konsolenbefehl verfügbar.
+Aufruf: `hue-agent-feedback [--config PATH] BEFEHL` (oder `python -m hue_agent_feedback [--config PATH] BEFEHL`).
 
 | Befehl | Argumente | Verhalten |
 | --- | --- | --- |

@@ -1,5 +1,5 @@
 param(
-    [string]$RepositoryName = 'hue-task-mcp',
+    [string]$RepositoryName = 'HueAgentFeedback',
     [string]$GitHubUsername = ''
 )
 $ErrorActionPreference = 'Stop'
@@ -38,7 +38,7 @@ try {
     if (-not (Test-Path -LiteralPath '.git')) { git init -b main; if ($LASTEXITCODE -ne 0) { throw 'git init failed' } }
     $trackedSecrets = git ls-files -- '*.local.json' '.env'
     if ($trackedSecrets) { throw 'A local credentials file is tracked. Refusing to publish.' }
-    git add -- .github .gitignore pyproject.toml README.md CHANGELOG.md docs hue_task_mcp tests examples Publish-PrivateRepo.ps1
+    git add -- .github .gitignore pyproject.toml README.md CHANGELOG.md docs hue_agent_feedback hue_task_mcp tests examples Publish-PrivateRepo.ps1
     if ($LASTEXITCODE -ne 0) { throw 'git add failed' }
     git diff --cached --quiet
     if ($LASTEXITCODE -eq 1) { git commit -m 'Add tested Hue MCP task indicators'; if ($LASTEXITCODE -ne 0) { throw 'git commit failed' } }

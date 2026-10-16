@@ -11,8 +11,8 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.scripts]
-hue-agent-feedback = "hue_task_mcp.cli:main"
-hue-task-mcp = "hue_task_mcp.cli:main"
+hue-agent-feedback = "hue_agent_feedback.cli:main"
+hue-task-mcp = "hue_agent_feedback.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["hue_task_mcp*"]
+include = ["hue_agent_feedback*", "hue_task_mcp*"]

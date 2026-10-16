@@ -81,11 +81,11 @@ Der Befehl trägt automatisch folgende Konfiguration in `%USERPROFILE%\.gemini\c
 
 ```json
 {
-  "hue-task": {
+  "hue-agent-feedback": {
     "Stop": [
       {
         "type": "command",
-        "command": "\"C:/dev/hue-task-mcp/.venv/Scripts/python.exe\" -m hue_task_mcp --config \"C:/dev/hue-task-mcp/hue.local.json\" hook Stop",
+        "command": "\"C:/PATH/TO/HueAgentFeedback/.venv/Scripts/python.exe\" -m hue_agent_feedback --config \"C:/PATH/TO/HueAgentFeedback/hue.local.json\" hook Stop",
         "timeout": 15
       }
     ],
@@ -95,7 +95,7 @@ Der Befehl trägt automatisch folgende Konfiguration in `%USERPROFILE%\.gemini\c
         "hooks": [
           {
             "type": "command",
-            "command": "\"C:/dev/hue-task-mcp/.venv/Scripts/python.exe\" -m hue_task_mcp --config \"C:/dev/hue-task-mcp/hue.local.json\" hook PreToolUse",
+            "command": "\"C:/PATH/TO/HueAgentFeedback/.venv/Scripts/python.exe\" -m hue_agent_feedback --config \"C:/PATH/TO/HueAgentFeedback/hue.local.json\" hook PreToolUse",
             "timeout": 15
           }
         ]
