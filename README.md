@@ -85,7 +85,7 @@ Der Befehl trägt automatisch folgende Konfiguration in `%USERPROFILE%\.gemini\c
     "Stop": [
       {
         "type": "command",
-        "command": "\"C:/PATH/TO/HueAgentFeedback/.venv/Scripts/python.exe\" -m hue_agent_feedback --config \"C:/PATH/TO/HueAgentFeedback/hue.local.json\" hook Stop",
+        "command": "C:/PATH/TO/HueAgentFeedback/.venv/Scripts/python.exe -m hue_agent_feedback --config C:/PATH/TO/HueAgentFeedback/hue.local.json hook Stop",
         "timeout": 15
       }
     ],
@@ -95,7 +95,7 @@ Der Befehl trägt automatisch folgende Konfiguration in `%USERPROFILE%\.gemini\c
         "hooks": [
           {
             "type": "command",
-            "command": "\"C:/PATH/TO/HueAgentFeedback/.venv/Scripts/python.exe\" -m hue_agent_feedback --config \"C:/PATH/TO/HueAgentFeedback/hue.local.json\" hook PreToolUse",
+            "command": "C:/PATH/TO/HueAgentFeedback/.venv/Scripts/python.exe -m hue_agent_feedback --config C:/PATH/TO/HueAgentFeedback/hue.local.json hook PreToolUse",
             "timeout": 15
           }
         ]
@@ -104,6 +104,9 @@ Der Befehl trägt automatisch folgende Konfiguration in `%USERPROFILE%\.gemini\c
   }
 }
 ```
+
+> [!NOTE]
+> **Windows-Hinweis:** Antigravity führt Hook-Befehle unter Windows über `cmd.exe /c` aus. Die Pfade zu `python.exe` und der Konfiguration dürfen in `command` **nicht** zusätzlich in Anführungszeichen eingeschlossen werden (außer wenn ein Pfad tatsächlich Leerzeichen enthält), da `cmd.exe` den Befehl sonst mit `Der Befehl "\"..." ist entweder falsch geschrieben` abweist. Der `setup`-Befehl formatiert dies automatisch korrekt.
 
 * **`Stop`**: Feuert automatisch, sobald Antigravity eine Aufgabe erfolgreich oder mit finaler Antwort beendet (**Blau**).
 * **`PreToolUse` (Matcher: `ask_question`)**: Feuert unmittelbar vor dem Öffnen eines Nutzer-Fragedialogs (**Rot**).

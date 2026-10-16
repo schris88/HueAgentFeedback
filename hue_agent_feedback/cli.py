@@ -113,8 +113,10 @@ async def run_hook(args):
 
 def generate_hook_config(python_path: Path, config_path: Path) -> dict:
     py_exec = python_path.resolve().as_posix()
-    cfg_arg = f' --config "{config_path.resolve().as_posix()}"'
-    base_cmd = f'"{py_exec}" -m hue_agent_feedback{cfg_arg} hook'
+    cfg_posix = config_path.resolve().as_posix()
+    py_str = f'"{py_exec}"' if " " in py_exec else py_exec
+    cfg_str = f'"{cfg_posix}"' if " " in cfg_posix else cfg_posix
+    base_cmd = f"{py_str} -m hue_agent_feedback --config {cfg_str} hook"
     return {
         "Stop": [
             {

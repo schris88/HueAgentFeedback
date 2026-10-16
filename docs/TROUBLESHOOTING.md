@@ -37,6 +37,7 @@ Erst wenn ein Schritt funktioniert, zur nächsten Ebene wechseln. Kopplung ist n
 | JSON-Fehler | Gültiges JSON ohne Kommentare/Trailing Commas und UTF-8 verwenden. |
 | Zertifikatsfehler mit `ca_file` | CA-Bundle, Pfad, Zertifikatskette und IP-Identität prüfen. Ein fremdes Root-Zertifikat reicht nicht aus. |
 | CLI funktioniert, Client nicht | Absoluten Interpreterpfad, `cwd`, Tools, Berechtigungen und Agent-Regeln prüfen; Client neu starten. |
+| Hook feuert nicht / `Der Befehl "\"..." ist falsch` | In `hooks.json` unter Windows keine redundanten Anführungszeichen um `python.exe` oder `--config` setzen, wenn die Pfade keine Leerzeichen enthalten. `cmd.exe /c` bricht sonst ab. Mit `hue-agent-feedback setup` neu generieren. |
 | Nur ein Client funktioniert | Beide müssen denselben Code und denselben absoluten Konfigurationspfad laden. |
 | HTTP-Port belegt | Anderen Port mit `--port` wählen und den Tunnel-/Client-Endpunkt entsprechend ändern. |
 | Git-Push geht, Publish-Skript nicht | API-Berechtigung zum Erstellen privater Repositorys kann fehlen. Auch kann ein Sandbox-Prozess keinen Zugriff auf den Windows-Credential-Store haben. Im eigenen authentifizierten Terminal ausführen oder normal per GitHub Desktop veröffentlichen. |
