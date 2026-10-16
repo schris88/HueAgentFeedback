@@ -3,13 +3,13 @@
     "Stop": [
       {
         "type": "command",
-        "command": "python -m hue_task_mcp signal done"
+        "command": "python -m hue_agent_feedback signal done"
       }
     ],
     "Notification": [
       {
         "type": "command",
-        "command": "python -m hue_task_mcp signal question"
+        "command": "python -m hue_agent_feedback signal question"
       }
     ]
   }
