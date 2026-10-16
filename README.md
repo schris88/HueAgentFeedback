@@ -4,8 +4,8 @@ Use the Philips Hue lightstrip behind your monitor as an AI task indicator:
 
 | Tool | Signal |
 | --- | --- |
-| `task_done` | One dim blue pulse, then restore the previous light state |
-| `needs_input` | One slow brightness dip in the existing color, then restore |
+| `task_done` | Two gentle blue blends into the current color, then restore |
+| `needs_input` | Two gentle red blends into the current color, then restore |
 | `light_status` | Read state and supported color/effect/gradient capabilities |
 
 Works with local stdio MCP clients such as Antigravity CLI. Also serves Streamable HTTP for a ChatGPT Secure MCP Tunnel. No OpenAI API key is needed for the Hue server itself.
@@ -77,7 +77,7 @@ Hue references:
 
 ## Behavior and limits
 
-- Completion: one blue pulse at at most 20% brightness (12% when previously off), with a 450 ms fade in, 1.1 seconds total before restoration, and an 800 ms fade back. Question: dim to 65% of current brightness over one second, then fade back over 800 ms. No red flashes or black-out lead-in. Questions do not wake an off light.
+- Both events: two eased color swells, mixing 22% of the blue/red target into the current CIE xy color. Each swell fades toward the blended color for one second and back for one second. Brightness stays unchanged; no on/off flashes. Off lights stay off. Existing gradient points are blended individually. Set `color_mix` in the local config between 0.05 and 0.5 to tune intensity (default 0.22).
 - Snapshots/restores power, brightness, active white temperature or color, gradients, and the active basic effect when exposed by the light. Advanced effect parameters and dynamic-scene playback cannot be reconstructed; pause dynamic scenes first.
 - Restoration runs after ordinary errors and cancellation, with up to three attempts. Power loss, process termination, or persistent network failure can prevent it. A concurrent change in the Hue app during a signal may be overwritten by restoration.
 - OS file locks serialize signals across local stdio/HTTP server processes. A waiting signal times out after 60 seconds.

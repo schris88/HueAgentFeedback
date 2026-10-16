@@ -102,26 +102,33 @@ class Indicator:
                 if light.get("dynamics", {}).get("status") not in (None, "none"):
                     raise RuntimeError("Pause the dynamic scene first so its state can be preserved")
                 original = restore_state(light)
-                # Do not wake an intentionally dark light just to ask a question.
-                if event == "question" and not light["on"]["on"]:
+                # Keep an intentionally dark room dark.
+                if not light["on"]["on"]:
                     return {"event": event, "skipped": True, "reason": "light_is_off"}
-                brightness = light.get("dimming", {}).get("brightness", 30)
-                pulse = {"on": {"on": True}, "color": {"xy": {"x": 0.153, "y": 0.048}},
-                         "dimming": {"brightness": min(20, brightness) if light["on"]["on"] else 12},
-                         "dynamics": {"duration": 450}}
+                target = {"x": 0.153, "y": 0.048} if event == "done" else {"x": 0.675, "y": 0.322}
+                amount = float(self.bridge.config.get("color_mix", 0.22))
+                if not 0.05 <= amount <= 0.5:
+                    raise ValueError("color_mix must be between 0.05 and 0.5")
+                def mix(xy):
+                    return {axis: xy[axis] + amount * (target[axis] - xy[axis]) for axis in ("x", "y")}
+                pulse = {"color": {"xy": mix(light["color"]["xy"])},
+                         "dynamics": {"duration": 1000}}
+                gradient = light.get("gradient", {})
+                if gradient.get("points"):
+                    pulse["gradient"] = {"points": [
+                        {"color": {"xy": mix(point["color"]["xy"])}}
+                        for point in gradient["points"]]}
+                    if "mode" in gradient:
+                        pulse["gradient"]["mode"] = gradient["mode"]
                 if "effects" in light:
                     pulse["effects"] = {"effect": "no_effect"}
                 try:
-                    if event == "done":
-                        # One low-brightness blue pulse; no black-out or repeated flashes.
+                    # Two eased color swells, preserving brightness and avoiding on/off flashes.
+                    for _ in range(2):
                         await self.bridge.put(light_id, pulse)
-                        await self.sleep(1.1)
-                    else:
-                        # One slow dip in the existing color, followed by a smooth return.
-                        await self.bridge.put(light_id, {
-                            "dimming": {"brightness": max(0.1, brightness * 0.65)},
-                            "dynamics": {"duration": 1000}})
-                        await self.sleep(1.2)
+                        await self.sleep(1.25)
+                        await self.bridge.put(light_id, {**original, "dynamics": {"duration": 1000}})
+                        await self.sleep(1.15)
                 finally:
                     # Shield cleanup from normal MCP cancellation. Power loss cannot be handled.
                     async def restore():
@@ -140,5 +147,5 @@ class Indicator:
                     except asyncio.CancelledError:
                         await task
                         raise
-                return {"event": event, "pattern": "soft_blue_pulse" if event == "done" else "brightness_dip",
-                        "pulses": 1, "restored": True}
+                return {"event": event, "pattern": "blue_color_blend" if event == "done" else "red_color_blend",
+                        "pulses": 2, "mix": amount, "restored": True}

@@ -30,7 +30,7 @@ def make_server(config_path):
     from mcp.server import MCPServer
     from .locking import file_lock
     server = MCPServer("hue-task-mcp", version="0.1.0", instructions=(
-        "Call task_done once immediately before the final answer for a completed task (one soft blue pulse). "
+        "Call task_done once immediately before the final answer for a completed task (two gentle blue color blends). "
         "Call needs_input once immediately before asking a question that requires the user's response. "
         "Never signal completion for an incomplete task. Do not signal routine progress updates."))
     # Read configuration for every call so pairing/selection does not need a restart.
@@ -39,12 +39,12 @@ def make_server(config_path):
 
     @server.tool()
     async def task_done() -> dict:
-        """Show one soft, dim blue pulse, then restore the monitor light. Call before the final answer when the task is complete."""
+        """Ease a little blue into the current color twice, preserving brightness, then restore. Call before the final answer when the task is complete."""
         return await indicator().signal("done")
 
     @server.tool()
     async def needs_input() -> dict:
-        """Slowly dip and restore brightness in the current color once. Skip when off. Call immediately before asking the user a question requiring a reply."""
+        """Ease a little red into the current color twice, preserving brightness, then restore. Skip when off. Call immediately before asking the user a question requiring a reply."""
         return await indicator().signal("question")
 
     @server.tool()

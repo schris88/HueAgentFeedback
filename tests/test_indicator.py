@@ -38,27 +38,27 @@ class IndicatorTests(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(self.temp.cleanup)
         self.path = Path(self.temp.name) / "hue.lock"
 
-    async def test_single_subtle_signal_and_restore(self):
+    async def test_two_color_blends_preserve_brightness_and_restore(self):
         for event in ["done", "question"]:
             bridge = FakeBridge()
             result = await Indicator(bridge, self.path, no_wait).signal(event)
-            self.assertEqual(len(bridge.writes), 2)
-            if event == "done":
-                self.assertEqual(bridge.writes[0]["color"]["xy"]["x"], 0.153)
-                self.assertLessEqual(bridge.writes[0]["dimming"]["brightness"], 20)
-            else:
-                self.assertNotIn("color", bridge.writes[0])
-                self.assertNotIn("on", bridge.writes[0])
-                self.assertEqual(bridge.writes[0]["dimming"]["brightness"], 38 * 0.65)
+            self.assertEqual(len(bridge.writes), 5)
+            target_x = 0.153 if event == "done" else 0.675
+            for i in [0, 2]:
+                self.assertAlmostEqual(bridge.writes[i]["color"]["xy"]["x"], 0.4 + 0.22 * (target_x - 0.4))
+                self.assertNotIn("on", bridge.writes[i])
+                self.assertNotIn("dimming", bridge.writes[i])
+                self.assertEqual(bridge.writes[i]["dynamics"]["duration"], 1000)
             self.assertEqual(bridge.writes[-1], {**restore_state(LIGHT), "dynamics": {"duration": 800}})
-            self.assertEqual(result["pulses"], 1)
+            self.assertEqual(result["pulses"], 2)
 
     async def test_off_light_returns_off(self):
         light = copy.deepcopy(LIGHT)
         light["on"]["on"] = False
         bridge = FakeBridge(light)
-        await Indicator(bridge, self.path, no_wait).signal("done")
-        self.assertFalse(bridge.writes[-1]["on"]["on"])
+        result = await Indicator(bridge, self.path, no_wait).signal("done")
+        self.assertTrue(result["skipped"])
+        self.assertEqual(bridge.writes, [])
 
     async def test_restore_after_write_failure(self):
         bridge = FakeBridge(fail_at=1)
@@ -67,9 +67,9 @@ class IndicatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bridge.writes[-1], {**restore_state(LIGHT), "dynamics": {"duration": 800}})
 
     async def test_retry_restore(self):
-        bridge = FakeBridge(fail_at=2)
+        bridge = FakeBridge(fail_at=5)
         await Indicator(bridge, self.path, no_wait).signal("done")
-        self.assertEqual(len(bridge.writes), 3)
+        self.assertEqual(len(bridge.writes), 6)
         self.assertEqual(bridge.writes[-1], {**restore_state(LIGHT), "dynamics": {"duration": 800}})
 
     async def test_restore_on_cancellation(self):
@@ -112,10 +112,10 @@ class IndicatorTests(unittest.IsolatedAsyncioTestCase):
         a = Indicator(bridge, self.path, yield_time)
         b = Indicator(bridge, self.path, yield_time)
         await asyncio.gather(a.signal("done"), b.signal("question"))
-        self.assertEqual(bridge.writes[1], {**restore_state(LIGHT), "dynamics": {"duration": 800}})
-        self.assertEqual(bridge.writes[3], {**restore_state(LIGHT), "dynamics": {"duration": 800}})
-        self.assertEqual(bridge.writes[0]["color"]["xy"]["x"], 0.153)
-        self.assertNotIn("color", bridge.writes[2])
+        self.assertEqual(bridge.writes[4], {**restore_state(LIGHT), "dynamics": {"duration": 800}})
+        self.assertEqual(bridge.writes[9], {**restore_state(LIGHT), "dynamics": {"duration": 800}})
+        self.assertLess(bridge.writes[0]["color"]["xy"]["x"], 0.4)
+        self.assertGreater(bridge.writes[5]["color"]["xy"]["x"], 0.4)
 
     async def test_question_does_not_wake_off_light(self):
         light = copy.deepcopy(LIGHT)
@@ -124,6 +124,19 @@ class IndicatorTests(unittest.IsolatedAsyncioTestCase):
         result = await Indicator(bridge, self.path, no_wait).signal("question")
         self.assertTrue(result["skipped"])
         self.assertEqual(bridge.writes, [])
+
+    async def test_blend_preserves_gradient_shape(self):
+        light = copy.deepcopy(LIGHT)
+        light["gradient"] = {"points": [{"color": {"xy": {"x": 0.5, "y": 0.4}}},
+                                         {"color": {"xy": {"x": 0.3, "y": 0.3}}}],
+                             "mode": "interpolated_palette"}
+        bridge = FakeBridge(light)
+        await Indicator(bridge, self.path, no_wait).signal("question")
+        points = bridge.writes[0]["gradient"]["points"]
+        self.assertEqual(len(points), 2)
+        self.assertAlmostEqual(points[0]["color"]["xy"]["x"], 0.5 + 0.22 * (0.675 - 0.5))
+        self.assertNotEqual(points[0], points[1])
+        self.assertEqual(bridge.writes[-1]["gradient"]["points"], light["gradient"]["points"])
 
     def test_gradient_and_effect_snapshot(self):
         light = copy.deepcopy(LIGHT)

@@ -23,7 +23,7 @@ try {
     if ($repo) {
         if (-not $repo.private) { throw 'Existing repository is public. Refusing to push.' }
     } else {
-        $body = @{ name = $RepositoryName; private = $true; description = 'Subtle Hue MCP indicators: one soft blue pulse for done, one brightness dip for questions.' } | ConvertTo-Json
+        $body = @{ name = $RepositoryName; private = $true; description = 'Subtle Hue MCP indicators: gentle blue color blends for done, red blends for questions.' } | ConvertTo-Json
         $repo = Invoke-RestMethod -Method Post -Uri 'https://api.github.com/user/repos' -Headers $headers -ContentType 'application/json' -Body $body
     }
     if (-not $repo.private) { throw 'Private repository verification failed.' }
