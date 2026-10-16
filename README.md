@@ -1,17 +1,17 @@
-# Hue Task MCP
+# HueAgentFeedback
 
 Dezente Philips-Hue-Lichtsignale für KI-Assistenten: Der Monitor-Lightstrip zeigt an, dass eine Aufgabe fertig ist oder eine Rückfrage auf deine Antwort wartet.
 
-| Werkzeug | Wirkung |
+| Werkzeug / Event | Wirkung |
 | --- | --- |
-| `task_done` | Zweimal langsam etwas Blau in die aktuelle Farbe mischen |
-| `needs_input` | Zweimal langsam etwas Rot in die aktuelle Farbe mischen |
+| `task_done` / `Stop` | Zweimal langsam etwas Blau in die aktuelle Farbe mischen |
+| `needs_input` / `PreToolUse` | Zweimal langsam etwas Rot in die aktuelle Farbe mischen |
 | `light_status` | Zustand und Fähigkeiten der ausgewählten Leuchte lesen |
 
 Die Helligkeit bleibt unverändert. Statt harter Blitze gibt es sanfte Farbverläufe mit anschließender Wiederherstellung des vorherigen Zustands. Standardmäßig werden 22 % der Zielfarbe in die aktuellen CIE-xy-Farbkoordinaten gemischt. Vorhandene Gradient-Farbpunkte werden einzeln gemischt. **Ausgeschaltete Leuchten bleiben garantiert aus** (kein Aufwecken oder Verändern eines dunklen Raums).
 
 ### Zwei Betriebsmodi
-1. **Antigravity CLI Lifecycle Hooks (empfohlen)**: Wie beim [Tiny Engineer](https://github.com/jamro/tiny-engineer) klinkt sich `hue-task` direkt in die Antigravity-Lebenszyklus-Events ein (`Stop` und `PreToolUse: ask_question`). Das Signal erfolgt **100 % deterministisch auf Systemebene**, ganz ohne Tokenverbrauch oder Prompt-Regeln. Einrichtung: `python -m hue_task_mcp setup --global`.
+1. **Antigravity CLI Lifecycle Hooks (empfohlen)**: Wie beim [Tiny Engineer](https://github.com/jamro/tiny-engineer) klinkt sich `HueAgentFeedback` direkt in die Antigravity-Lebenszyklus-Events ein (`Stop` und `PreToolUse: ask_question`). Das Signal erfolgt **100 % deterministisch auf Systemebene**, ganz ohne Tokenverbrauch oder Prompt-Regeln. Einrichtung: `python -m hue_task_mcp setup --global`.
 2. **Klassische MCP-Werkzeuge**: Für Clients wie Codex oder manuelle Werkzeugaufrufe (`task_done`, `needs_input`, `light_status`). Hierbei instruieren Agent-Anweisungen das Sprachmodell.
 
 ## Dokumentation
@@ -30,7 +30,7 @@ Die Helligkeit bleibt unverändert. Statt harter Blitze gibt es sanfte Farbverl�
 - Hue Bridge mit v2-API und lokaler IPv4-Adresse im erreichbaren Netzwerk.
 - Eine an der Bridge angemeldete **farbfähige** Hue-Leuchte oder ein farbfähiger Lightstrip. Reine Weißlicht-Leuchten reichen nicht aus.
 - Zugriff auf die physische Bridge-Taste für die erste Kopplung.
-- Ein MCP-Client mit lokaler stdio-Unterstützung, beispielsweise Codex oder Antigravity CLI. ChatGPT im Browser benötigt eine separate Verbindung.
+- Ein MCP-Client mit lokaler stdio-Unterstützung, beispielsweise Antigravity CLI oder Codex. ChatGPT im Browser benötigt eine separate Verbindung.
 - Internet zum Installieren der Abhängigkeiten. Die Bridge-Suche verwendet ebenfalls einen Internetdienst; mit bekannter IP erfolgen Kopplung und Lichtsteuerung lokal.
 
 Die Hue-Sync-PC-App muss nicht laufen. Bluetooth ohne Bridge wird nicht unterstützt. Aktives Entertainment/Sync und dynamische Szenen müssen für die ausgewählte Leuchte pausiert sein.
@@ -39,14 +39,14 @@ Die Anleitung verwendet **Windows PowerShell**. Unter Linux/macOS `.venv/Scripts
 
 ## 1. Installieren
 
-Das Repository herunterladen oder klonen, beispielsweise nach `C:\dev\hue-task-mcp`. Für ein privates Repository brauchst du vorher Zugriff. Eine Veröffentlichung als PyPI-Paket gibt es derzeit nicht.
-
 ```powershell
-cd C:\dev\hue-task-mcp
-python --version
+git clone https://github.com/schris88/HueAgentFeedback.git
+cd HueAgentFeedback
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe -m hue_task_mcp --help
+```
 .\.venv\Scripts\python.exe -m hue_task_mcp --help
 ```
 
