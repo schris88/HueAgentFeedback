@@ -1,0 +1,23 @@
+{
+  "hue-task": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "\"C:/PATH/TO/hue-task-mcp/.venv/Scripts/python.exe\" -m hue_task_mcp --config \"C:/PATH/TO/hue-task-mcp/hue.local.json\" hook Stop",
+        "timeout": 15
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "ask_question",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:/PATH/TO/hue-task-mcp/.venv/Scripts/python.exe\" -m hue_task_mcp --config \"C:/PATH/TO/hue-task-mcp/hue.local.json\" hook PreToolUse",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

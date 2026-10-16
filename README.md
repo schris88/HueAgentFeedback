@@ -8,9 +8,11 @@ Dezente Philips-Hue-Lichtsignale für KI-Assistenten: Der Monitor-Lightstrip zei
 | `needs_input` | Zweimal langsam etwas Rot in die aktuelle Farbe mischen |
 | `light_status` | Zustand und Fähigkeiten der ausgewählten Leuchte lesen |
 
-Die Helligkeit bleibt unverändert. Statt harter Blitze gibt es sanfte Farbverläufe mit anschließender Wiederherstellung des vorherigen Zustands. Standardmäßig werden 22 % der Zielfarbe in die aktuellen CIE-xy-Farbkoordinaten gemischt. Vorhandene Gradient-Farbpunkte werden einzeln gemischt. Ausgeschaltete Leuchten bleiben aus.
+Die Helligkeit bleibt unverändert. Statt harter Blitze gibt es sanfte Farbverläufe mit anschließender Wiederherstellung des vorherigen Zustands. Standardmäßig werden 22 % der Zielfarbe in die aktuellen CIE-xy-Farbkoordinaten gemischt. Vorhandene Gradient-Farbpunkte werden einzeln gemischt. **Ausgeschaltete Leuchten bleiben garantiert aus** (kein Aufwecken oder Verändern eines dunklen Raums).
 
-**MCP stellt Werkzeuge bereit, erkennt aber selbst keine Chat-Ereignisse.** Der Assistent muss die Werkzeuge aufrufen. Dafür sind zusätzlich Agent-Anweisungen nötig. Client-Freigabedialoge, Abstürze und nicht signalisierte Rückfragen werden nicht automatisch erkannt.
+### Zwei Betriebsmodi
+1. **Antigravity CLI Lifecycle Hooks (empfohlen)**: Wie beim [Tiny Engineer](https://github.com/jamro/tiny-engineer) klinkt sich `hue-task` direkt in die Antigravity-Lebenszyklus-Events ein (`Stop` und `PreToolUse: ask_question`). Das Signal erfolgt **100 % deterministisch auf Systemebene**, ganz ohne Tokenverbrauch oder Prompt-Regeln. Einrichtung: `python -m hue_task_mcp setup --global`.
+2. **Klassische MCP-Werkzeuge**: Für Clients wie Codex oder manuelle Werkzeugaufrufe (`task_done`, `needs_input`, `light_status`). Hierbei instruieren Agent-Anweisungen das Sprachmodell.
 
 ## Dokumentation
 
@@ -107,7 +109,57 @@ Es sollten drei Werkzeuge verfügbar sein: `task_done`, `needs_input`, `light_st
 
 ## 5. Antigravity CLI einrichten
 
-Den folgenden Eintrag in `%USERPROFILE%\.gemini\config\mcp_config.json` unter `mcpServers` ergänzen. Vorhandene Server erhalten und Pfade anpassen:
+Für Antigravity CLI gibt es zwei Einbindungsvarianten:
+
+### Variante A: Lifecycle Hooks (empfohlen, wie Tiny Engineer)
+
+Wie beim [Tiny Engineer](https://github.com/jamro/tiny-engineer) reagiert das System direkt auf Lebenszyklus-Ereignisse der CLI über `hooks.json`. Dadurch signalisiert das Licht **vollautomatisch und deterministisch**, ohne dass Prompt-Regeln (`GEMINI.md`) oder LLM-Entscheidungen nötig sind:
+* **`Stop`**: Löst bei Aufgabenabschluss automatisch blaues Blinken aus.
+* **`PreToolUse` auf `ask_question`**: Löst vor Benutzer-Rückfragen automatisch rotes Blinken aus.
+
+Die Einrichtung erfolgt mit einem einzigen Befehl:
+
+```powershell
+# Global für alle Projekte einrichten (~/.gemini/config/hooks.json):
+.\.venv\Scripts\python.exe -m hue_task_mcp setup --global
+
+# Oder nur für das aktuelle Projekt (.agents/hooks.json):
+.\.venv\Scripts\python.exe -m hue_task_mcp setup
+```
+
+Der Befehl erstellt oder ergänzt die Konfiguration in `hooks.json` automatisch:
+
+```json
+{
+  "hue-task": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "\"C:/dev/hue-task-mcp/.venv/Scripts/python.exe\" -m hue_task_mcp --config \"C:/dev/hue-task-mcp/hue.local.json\" hook Stop",
+        "timeout": 15
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "ask_question",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:/dev/hue-task-mcp/.venv/Scripts/python.exe\" -m hue_task_mcp --config \"C:/dev/hue-task-mcp/hue.local.json\" hook PreToolUse",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Zum Deinstallieren der Hooks einfach `--uninstall` an den Setup-Befehl übergeben.
+
+### Variante B: Klassischer MCP-Server
+
+Alternativ kann `hue-task` als klassischer MCP-Server in `%USERPROFILE%\.gemini\config\mcp_config.json` unter `mcpServers` registriert werden:
 
 ```json
 {
@@ -121,9 +173,9 @@ Den folgenden Eintrag in `%USERPROFILE%\.gemini\config\mcp_config.json` unter `m
 }
 ```
 
-Alternativ eine projektbezogene `.agents/mcp_config.json` verwenden. Die [Agent-Anweisungen](examples/agent-instructions.md) in die geladenen Regeln aufnehmen, beispielsweise `%USERPROFILE%\.gemini\GEMINI.md`. Mit `/mcp` den Status prüfen und Konfiguration neu laden beziehungsweise den Client neu starten. Danach den Testprompt aus dem Codex-Abschnitt verwenden.
+Hierbei müssen die [Agent-Anweisungen](examples/agent-instructions.md) in `%USERPROFILE%\.gemini\GEMINI.md` aufgenommen werden, damit das Modell weiß, wann es die Werkzeuge aufrufen soll. Mit `/mcp` kann der Serverstatus geprüft werden.
 
-Auch hier startet der Client den lokalen Server selbst. [Offizielle Antigravity-Anleitung](https://antigravity.google/docs/mcp?tab=cli) · [JSON-Vorlage](examples/mcp_config.json)
+[Offizielle Antigravity-Anleitung](https://antigravity.google/docs/mcp?tab=cli) · [JSON-Vorlage](examples/mcp_config.json)
 
 ## Andere lokale Clients und Linux/macOS
 

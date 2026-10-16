@@ -46,8 +46,12 @@ Aufruf: `python -m hue_task_mcp [--config PATH] BEFEHL`. Nach der Paketinstallat
 | `select` | `LIGHT_UUID` | Farbfähigkeit prüfen und Ziel-UUID speichern |
 | `signal` | `done` oder `question` | Ein Signal ausführen und Ergebnis ausgeben |
 | `serve` | `--transport stdio` oder `streamable-http`, optional `--port` | MCP-Server starten |
+| `hook` | `Stop`, `PreToolUse`, `done` oder `question` | Antigravity Lifecycle Hook Handler (signalisiert und gibt `{"decision": "allow"}` aus) |
+| `setup` | Optional `--global`, `--path PATH`, `--uninstall` | Automatische Einrichtung der `hooks.json` für Antigravity CLI |
 
 `serve` verwendet standardmäßig stdio. `--port` gilt nur für HTTP, Standard `8765`. HTTP bindet fest an `127.0.0.1`, Pfad `/mcp`; es gibt keinen `--host`-Parameter. Erfolgreiche einmalige Befehle enden mit Status 0. Abgefangene Konfigurations-/Bridge-Fehler enden mit Status 1. Nicht alle Betriebssystem- und Bibliotheksfehler werden in kurze CLI-Meldungen umgewandelt.
+
+`setup` richtet Antigravity Lifecycle Hooks in `.agents/hooks.json` (lokal) oder mit `--global` in `%USERPROFILE%\.gemini\config\hooks.json` ein. Dadurch werden `Stop` (Aufgabe beendet -> Blau) und `PreToolUse` (Rückfrage via `ask_question` -> Rot) deterministisch auf Systemebene ausgelöst, ohne dass LLM-Regeln erforderlich sind.
 
 ## MCP-Werkzeuge
 

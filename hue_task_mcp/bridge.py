@@ -95,6 +95,9 @@ class Indicator:
                 if not light_id:
                     raise RuntimeError("Select your monitor light first with the select command")
                 light = await self.bridge.light(light_id)
+                # Keep an intentionally dark room dark: skip if light is turned off
+                if not light.get("on", {}).get("on", False):
+                    return {"event": event, "skipped": True, "reason": "light_is_off"}
                 if "color" not in light:
                     raise RuntimeError("This light cannot display blue and red; select a color light")
                 if light.get("mode") == "streaming":
@@ -102,9 +105,6 @@ class Indicator:
                 if light.get("dynamics", {}).get("status") not in (None, "none"):
                     raise RuntimeError("Pause the dynamic scene first so its state can be preserved")
                 original = restore_state(light)
-                # Keep an intentionally dark room dark.
-                if not light["on"]["on"]:
-                    return {"event": event, "skipped": True, "reason": "light_is_off"}
                 target = {"x": 0.153, "y": 0.048} if event == "done" else {"x": 0.675, "y": 0.322}
                 amount = float(self.bridge.config.get("color_mix", 0.22))
                 if not 0.05 <= amount <= 0.5:

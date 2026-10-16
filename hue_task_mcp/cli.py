@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 import ssl
+import sys
 from pathlib import Path
 
 from .bridge import Bridge, Indicator, request_json
@@ -109,6 +110,90 @@ async def local_action(args):
             print(json.dumps(await Indicator(bridge, path.with_suffix(".lock")).signal(args.event)))
 
 
+async def run_hook(args):
+    event = args.event
+    path = args.config.resolve()
+
+    signal_type = None
+    if event in ("Stop", "stop", "done"):
+        signal_type = "done"
+    elif event in ("PreToolUse", "pre_tool_use", "question"):
+        signal_type = "question"
+
+    if signal_type:
+        try:
+            bridge = Bridge(load_config(path))
+            await Indicator(bridge, path.with_suffix(".lock")).signal(signal_type)
+        except Exception as exc:
+            sys.stderr.write(f"[hue-task-mcp] Hook signal error: {exc}\n")
+
+    # Antigravity hook contract: Always emit JSON on stdout
+    print(json.dumps({"decision": "allow"}))
+
+
+def generate_hook_config(python_path: Path, config_path: Path) -> dict:
+    py_exec = python_path.resolve().as_posix()
+    cfg_arg = f' --config "{config_path.resolve().as_posix()}"'
+    base_cmd = f'"{py_exec}" -m hue_task_mcp{cfg_arg} hook'
+    return {
+        "Stop": [
+            {
+                "type": "command",
+                "command": f"{base_cmd} Stop",
+                "timeout": 15
+            }
+        ],
+        "PreToolUse": [
+            {
+                "matcher": "ask_question",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": f"{base_cmd} PreToolUse",
+                        "timeout": 15
+                    }
+                ]
+            }
+        ]
+    }
+
+
+def run_setup(args):
+    config_path = args.config.resolve()
+    py_path = Path(sys.executable)
+
+    if args.path:
+        target_file = args.path.resolve()
+    elif args.is_global:
+        target_file = Path.home() / ".gemini" / "config" / "hooks.json"
+    else:
+        target_file = Path.cwd() / ".agents" / "hooks.json"
+
+    target_file.parent.mkdir(parents=True, exist_ok=True)
+
+    data = {}
+    if target_file.exists():
+        try:
+            data = json.loads(target_file.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                data = {}
+        except Exception:
+            data = {}
+
+    if args.uninstall:
+        if "hue-task" in data:
+            del data["hue-task"]
+            target_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+            print(f"Removed hue-task hooks from: {target_file}")
+        else:
+            print(f"No hue-task entry found in: {target_file}")
+        return
+
+    data["hue-task"] = generate_hook_config(py_path, config_path)
+    target_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    print(f"Configured hue-task hooks in: {target_file}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Philips Hue MCP task indicators")
     parser.add_argument("--config", type=Path, default=Path(os.getenv("HUE_TASK_CONFIG", DEFAULT_CONFIG)))
@@ -124,6 +209,12 @@ def main():
     serve = sub.add_parser("serve")
     serve.add_argument("--transport", choices=["stdio", "streamable-http"], default="stdio")
     serve.add_argument("--port", type=int, default=8765)
+    hook = sub.add_parser("hook", help="Handle Antigravity lifecycle events")
+    hook.add_argument("event", choices=["Stop", "stop", "PreToolUse", "pre_tool_use", "done", "question"])
+    setup = sub.add_parser("setup", help="Configure Antigravity CLI lifecycle hooks")
+    setup.add_argument("--global", dest="is_global", action="store_true", help="Install hooks globally in ~/.gemini/config/hooks.json")
+    setup.add_argument("--path", type=Path, default=None, help="Target hooks.json path")
+    setup.add_argument("--uninstall", action="store_true", help="Remove hue-task hooks from target file")
     args = parser.parse_args()
     try:
         if args.command == "serve":
@@ -133,6 +224,10 @@ def main():
             else:
                 server.run(transport="streamable-http", host="127.0.0.1", port=args.port,
                            stateless_http=True, json_response=True)
+        elif args.command == "hook":
+            asyncio.run(run_hook(args))
+        elif args.command == "setup":
+            run_setup(args)
         else:
             asyncio.run(local_action(args))
     except (RuntimeError, ValueError, KeyError) as exc:

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Antigravity CLI Lifecycle Hooks (`hook` und `setup` Unterbefehle) nach dem Vorbild von Tiny Engineer implementiert.
+- Deterministische Signale auf Systemebene: `Stop` (Aufgabe beendet -> Blau) und `PreToolUse: ask_question` (Rückfrage -> Rot) ganz ohne Prompt-Regeln oder Tokenverbrauch.
+- Vollautomatisches Setup via `python -m hue_task_mcp setup [--global]`.
+- Ausgeschaltete Leuchten werden sofort übersprungen und bleiben garantiert aus.
+- Umfassende Unit-Tests für Hooks und Setup in `tests/test_cli.py`.
 - Vollständige deutsche Einrichtungsanleitung für neue Nutzer ergänzt.
 - Codex-, Antigravity- und Linux/macOS-Konfigurationsvorlagen sowie eine Konfiguration mit Platzhaltern ergänzt.
 - CLI-/MCP-Referenz, Architektur, Sicherheitsmodell, Fehlerhilfe und Entwicklungsanleitung hinzugefügt.
