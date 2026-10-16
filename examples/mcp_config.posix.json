@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "hue-task": {
+      "command": "/PATH/TO/hue-task-mcp/.venv/bin/python",
+      "args": ["-m", "hue_task_mcp", "serve"],
+      "cwd": "/PATH/TO/hue-task-mcp"
+    }
+  }
+}

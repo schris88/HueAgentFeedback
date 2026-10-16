@@ -1,103 +1,210 @@
 # Hue Task MCP
 
-Use the Philips Hue lightstrip behind your monitor as an AI task indicator:
+Dezente Philips-Hue-Lichtsignale für KI-Assistenten: Der Monitor-Lightstrip zeigt an, dass eine Aufgabe fertig ist oder eine Rückfrage auf deine Antwort wartet.
 
-| Tool | Signal |
+| Werkzeug | Wirkung |
 | --- | --- |
-| `task_done` | Two gentle blue blends into the current color, then restore |
-| `needs_input` | Two gentle red blends into the current color, then restore |
-| `light_status` | Read state and supported color/effect/gradient capabilities |
+| `task_done` | Zweimal langsam etwas Blau in die aktuelle Farbe mischen |
+| `needs_input` | Zweimal langsam etwas Rot in die aktuelle Farbe mischen |
+| `light_status` | Zustand und Fähigkeiten der ausgewählten Leuchte lesen |
 
-Works with local stdio MCP clients such as Antigravity CLI. Also serves Streamable HTTP for a ChatGPT Secure MCP Tunnel. No OpenAI API key is needed for the Hue server itself.
+Die Helligkeit bleibt unverändert. Statt harter Blitze gibt es sanfte Farbverläufe mit anschließender Wiederherstellung des vorherigen Zustands. Standardmäßig werden 22 % der Zielfarbe in die aktuellen CIE-xy-Farbkoordinaten gemischt. Vorhandene Gradient-Farbpunkte werden einzeln gemischt. Ausgeschaltete Leuchten bleiben aus.
 
-## Install and pair
+**MCP stellt Werkzeuge bereit, erkennt aber selbst keine Chat-Ereignisse.** Der Assistent muss die Werkzeuge aufrufen. Dafür sind zusätzlich Agent-Anweisungen nötig. Client-Freigabedialoge, Abstürze und nicht signalisierte Rückfragen werden nicht automatisch erkannt.
 
-Requires Python 3.11+ and a Hue Bridge on the same LAN. Bluetooth-only lights are not supported. Hue Sync does not need to be running.
+## Dokumentation
+
+- [Konfiguration, CLI und MCP-Referenz](docs/REFERENCE.md)
+- [Architektur und Ablauf](docs/ARCHITECTURE.md)
+- [Fehlerbehebung und Betrieb](docs/TROUBLESHOOTING.md)
+- [Sicherheit und Datenschutz](docs/SECURITY.md)
+- [Entwicklung, Tests und Erweiterungen](docs/DEVELOPMENT.md)
+- [Agent-Anweisungen zum Kopieren](examples/agent-instructions.md)
+- [Änderungsverlauf](CHANGELOG.md)
+
+## Voraussetzungen
+
+- Python **3.11 oder neuer**, `pip` und `venv`.
+- Hue Bridge mit v2-API und lokaler IPv4-Adresse im erreichbaren Netzwerk.
+- Eine an der Bridge angemeldete **farbfähige** Hue-Leuchte oder ein farbfähiger Lightstrip. Reine Weißlicht-Leuchten reichen nicht aus.
+- Zugriff auf die physische Bridge-Taste für die erste Kopplung.
+- Ein MCP-Client mit lokaler stdio-Unterstützung, beispielsweise Codex oder Antigravity CLI. ChatGPT im Browser benötigt eine separate Verbindung.
+- Internet zum Installieren der Abhängigkeiten. Die Bridge-Suche verwendet ebenfalls einen Internetdienst; mit bekannter IP erfolgen Kopplung und Lichtsteuerung lokal.
+
+Die Hue-Sync-PC-App muss nicht laufen. Bluetooth ohne Bridge wird nicht unterstützt. Aktives Entertainment/Sync und dynamische Szenen müssen für die ausgewählte Leuchte pausiert sein.
+
+Die Anleitung verwendet **Windows PowerShell**. Unter Linux/macOS `.venv/Scripts/python.exe` durch `.venv/bin/python` ersetzen. Physisch getestet wurde unter Windows; die CI ist für Windows und Linux konfiguriert.
+
+## 1. Installieren
+
+Das Repository herunterladen oder klonen, beispielsweise nach `C:\dev\hue-task-mcp`. Für ein privates Repository brauchst du vorher Zugriff. Eine Veröffentlichung als PyPI-Paket gibt es derzeit nicht.
 
 ```powershell
+cd C:\dev\hue-task-mcp
+python --version
 python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -e .
-.\.venv\Scripts\python.exe -m hue_task_mcp discover
-.\.venv\Scripts\python.exe -m hue_task_mcp pair --bridge YOUR_BRIDGE_IP
+.\.venv\Scripts\python.exe -m hue_task_mcp --help
 ```
 
-Press the physical Bridge button during pairing. A separate application key is saved in `hue.local.json`, which Git ignores. Do not upload that file. This application key is authorized at Bridge level, not restricted by Hue to a single light; the MCP tools restrict their actions to the configured light.
+Die virtuelle Umgebung muss nicht aktiviert werden. Alle Befehle verwenden den Interpreter direkt. Bei einem späteren Umzug des Projektordners die venv neu erstellen und Client-Pfade anpassen.
+
+## 2. Bridge finden und koppeln
+
+```powershell
+.\.venv\Scripts\python.exe -m hue_task_mcp discover
+```
+
+Die Ausgabe enthält `internalipaddress`. Alternativ die Bridge-IP in der Hue-App oder im Router nachsehen. `192.168.1.20` ist hier nur ein Beispiel:
+
+```powershell
+.\.venv\Scripts\python.exe -m hue_task_mcp pair --bridge 192.168.1.20
+```
+
+**Während der Befehl wartet, die physische Bridge-Taste drücken.** Es gibt 45 Kopplungsversuche mit jeweils zwei Sekunden Abstand; Netzwerkwartezeiten können die Gesamtdauer verlängern.
+
+Bei Erfolg wird im Projektordner `hue.local.json` gespeichert. Sie enthält deinen persönlichen Bridge-Schlüssel und wird von Git ignoriert. Jeder Nutzer koppelt seine eigene Bridge. Die Datei nicht weitergeben.
+
+## 3. Leuchte auswählen und testen
 
 ```powershell
 .\.venv\Scripts\python.exe -m hue_task_mcp lights
+```
+
+Die Zeile der gewünschten Leuchte mit `"color": true` suchen. Ihre `id` ist eine **v2-Light-UUID**, keine alte numerische Hue-ID. Im folgenden Befehl `LIGHT_UUID` durch diesen vollständigen Wert ersetzen:
+
+```powershell
 .\.venv\Scripts\python.exe -m hue_task_mcp select LIGHT_UUID
 .\.venv\Scripts\python.exe -m hue_task_mcp signal done
 .\.venv\Scripts\python.exe -m hue_task_mcp signal question
 ```
 
-The config path can be changed with `HUE_TASK_CONFIG` or `--config PATH` **before** the subcommand. Keep the same config path for all clients so their blink sequences share the same OS lock.
+Zum Test die gewählte Leuchte einschalten. Erwartet werden zuerst zwei blaue, danach zwei rote Farbschwenks, jeweils mit Rückkehr zum vorherigen Zustand. Ein Signal dauert ohne Netzwerkverzögerung ungefähr **5,6 Sekunden**. Wenn die CLI funktioniert, ist die Bridge-Verbindung bereit; die Client-Integration folgt separat.
 
-## Antigravity CLI
+## 4. Codex einrichten
 
-Merge `examples/mcp_config.json` into the `mcpServers` object of `~/.gemini/config/mcp_config.json`, replacing the example paths with this repository's absolute paths. Preserve other servers. Antigravity also supports workspace `.agents/mcp_config.json`. Restart the CLI or use `/mcp` to reload and inspect the server.
+In `%USERPROFILE%\.codex\config.toml` diesen Abschnitt ergänzen. Vorhandene Konfiguration erhalten, Pfade ersetzen und denselben Abschnitt nicht doppelt anlegen:
 
-Add `examples/agent-instructions.md` to the agent's loaded instructions (for example, your global `~/.gemini/GEMINI.md`). The MCP server also supplies these instructions in its initialization response. Approve notification tools according to your client's normal permissions.
+```toml
+[mcp_servers.hue-task]
+command = 'C:/dev/hue-task-mcp/.venv/Scripts/python.exe'
+args = ["-m", "hue_task_mcp", "serve"]
+cwd = 'C:/dev/hue-task-mcp'
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+```
 
-**Automatic notifications:** MCP exposes callable tools. It does not subscribe to the chat UI's task lifecycle. The agent must call `task_done` or `needs_input` according to its instructions. Client permission dialogs, crashes, and questions the agent never signals cannot reliably trigger these tools. If your client offers documented lifecycle hooks, invoke `python -m hue_task_mcp signal done` or `signal question` from the relevant hook. No unverified hook names are installed by this project.
+Die [Agent-Anweisungen](examples/agent-instructions.md) an `%USERPROFILE%\.codex\AGENTS.md` anhängen. Bestehende Regeln erhalten. Eine nicht leere globale `AGENTS.override.md` hat Vorrang; die Regeln müssen in der tatsächlich geladenen Datei stehen.
 
-Official configuration reference: https://antigravity.google/docs/mcp?tab=cli
+**Codex vollständig neu starten und einen neuen Chat öffnen.** Testprompt:
 
-## ChatGPT
+> Verwende das Hue-MCP-Werkzeug needs_input einmal und stelle mir danach eine kurze Testfrage.
 
-ChatGPT needs a reachable MCP connection; an Antigravity stdio config does not register a tool in ChatGPT.
+Es sollten drei Werkzeuge verfügbar sein: `task_done`, `needs_input`, `light_status`. Die normalen Berechtigungsdialoge des Clients beachten. Codex startet den stdio-Server bei Bedarf; kein eigenes Terminal, Autostart, Tunnel oder OpenAI-API-Schlüssel ist für diese lokale Integration erforderlich.
 
-The private connection option documented by OpenAI is Secure MCP Tunnel:
+[Offizielle MCP-Anleitung](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) · [Agent-Anweisungen](https://learn.chatgpt.com/docs/agent-configuration/agents-md) · [Konfigurationsvorlage](examples/codex-config.toml)
 
-1. In OpenAI Platform tunnel settings, create a tunnel that includes the intended ChatGPT workspace. Appropriate tunnel permissions and a runtime key are required.
-2. Install/configure the official `tunnel-client` following OpenAI's current onboarding guide. Point it to this server's stdio command, or start the HTTP listener below and point the tunnel at `http://127.0.0.1:8765/mcp`.
-3. In ChatGPT on the web, open Plugins, add a custom MCP server, and choose the tunnel connection. Install the resulting plugin in the conversation.
-4. Add the notification instructions from `examples/agent-instructions.md` to your conversation or loaded instructions, and test both tools.
+## 5. Antigravity CLI einrichten
+
+Den folgenden Eintrag in `%USERPROFILE%\.gemini\config\mcp_config.json` unter `mcpServers` ergänzen. Vorhandene Server erhalten und Pfade anpassen:
+
+```json
+{
+  "mcpServers": {
+    "hue-task": {
+      "command": "C:/dev/hue-task-mcp/.venv/Scripts/python.exe",
+      "args": ["-m", "hue_task_mcp", "serve"],
+      "cwd": "C:/dev/hue-task-mcp"
+    }
+  }
+}
+```
+
+Alternativ eine projektbezogene `.agents/mcp_config.json` verwenden. Die [Agent-Anweisungen](examples/agent-instructions.md) in die geladenen Regeln aufnehmen, beispielsweise `%USERPROFILE%\.gemini\GEMINI.md`. Mit `/mcp` den Status prüfen und Konfiguration neu laden beziehungsweise den Client neu starten. Danach den Testprompt aus dem Codex-Abschnitt verwenden.
+
+Auch hier startet der Client den lokalen Server selbst. [Offizielle Antigravity-Anleitung](https://antigravity.google/docs/mcp?tab=cli) · [JSON-Vorlage](examples/mcp_config.json)
+
+## Andere lokale Clients und Linux/macOS
+
+Ein stdio-Client braucht Programm, Argumente und möglichst das Arbeitsverzeichnis. Beispiel: `.venv/Scripts/python.exe`, Argumente `-m hue_task_mcp serve`, Arbeitsverzeichnis der Projektordner. Die jeweiligen Feldnamen hängen vom Client ab.
+
+Unter Linux/macOS `.venv/bin/python` verwenden: [POSIX-Konfigurationsvorlage](examples/mcp_config.posix.json). Falls ein Client kein Arbeitsverzeichnis unterstützt, die editable Installation beibehalten und `HUE_TASK_CONFIG` als absoluten Pfad setzen. Details in der [Referenz](docs/REFERENCE.md).
+
+## ChatGPT im Browser
+
+Ein lokaler Codex-/Antigravity-Eintrag verbindet **nicht automatisch ChatGPT im Browser**. Dort einen eigenen erreichbaren MCP-Zugang einrichten.
+
+Eine von OpenAI dokumentierte private Verbindung ist **Secure MCP Tunnel**. Dafür werden passende Platform-/Workspace-Berechtigungen, eine Tunnel-Konfiguration und ein Runtime-Schlüssel für den offiziellen `tunnel-client` benötigt. Dieser Schlüssel gehört zum Tunnel, nicht zu diesem Hue-Server.
+
+1. In OpenAI Platform einen Tunnel für den vorgesehenen ChatGPT-Workspace einrichten.
+2. Den offiziellen `tunnel-client` gemäß OpenAI-Anleitung konfigurieren. Er kann den stdio-Server oder den unten gestarteten HTTP-Server erreichen.
+3. In ChatGPT einen eigenen MCP-Server über die angebotene Tunnel-Verbindung hinzufügen und für den Chat verfügbar machen.
+4. Die Agent-Anweisungen laden und die Werkzeuge testen.
 
 ```powershell
+cd C:\dev\hue-task-mcp
 .\.venv\Scripts\python.exe -m hue_task_mcp serve --transport streamable-http --port 8765
 ```
 
-The HTTP listener binds only to `127.0.0.1`. It has no application-level authentication and is intended for local clients or an access-controlled private tunnel. Do not forward this port publicly. Public deployment would require an authenticated HTTPS gateway and matching MCP/OAuth configuration. This project does not provision a tunnel or change your OpenAI account settings.
+Endpunkt: `http://127.0.0.1:8765/mcp`. Der Prozess muss während der HTTP-Nutzung laufen. Er bietet selbst keine Benutzeranmeldung und bindet nur an Loopback. Keine öffentliche Portweiterleitung einrichten. Verfügbarkeit und Dialoge richten sich nach dem aktuellen OpenAI-Angebot.
 
-Official guides:
-- https://developers.openai.com/api/docs/guides/custom-mcp-server
-- https://developers.openai.com/api/docs/guides/secure-mcp-tunnels
+[Tunnel-Anleitung](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) · [Eigenen MCP-Server hinzufügen](https://developers.openai.com/api/docs/guides/custom-mcp-server)
 
-## Control available on Hue
+## Signalstärke anpassen
 
-The Bridge's v2 API can control power, brightness, color coordinates, supported white temperatures, transitions, supported built-in effects, and supported gradients. Available properties depend on the exact light. `light_status` reads the chosen light's actual reported capabilities.
+In der bestehenden `hue.local.json` das Feld `color_mix` ändern oder ergänzen. Den echten Schlüssel und die UUID erhalten:
 
-This MCP server intentionally exposes the two indicators and read-only status. It does not expose arbitrary Bridge API requests, other household lights, scene editing, or continuous animation. Additional color/effect tools can be added using the same adapter. A gradient strip exposes supported control points/zones, which are not necessarily individually addressable LEDs.
-
-For fast, continuous animations or audio/video synchronization, Hue requires the Entertainment streaming API, an entertainment area, and the appropriate client key/DTLS implementation. This server uses occasional REST commands instead. Hue Sync can take control of an entertainment light; this server refuses to signal while the light reports streaming mode rather than taking over your Sync session.
-
-Hue references:
-- https://developers.meethue.com/develop/get-started-2/
-- https://developers.meethue.com/new-hue-api/
-
-## Behavior and limits
-
-- Both events: two eased color swells, mixing 22% of the blue/red target into the current CIE xy color. Each swell fades toward the blended color for one second and back for one second. Brightness stays unchanged; no on/off flashes. Off lights stay off. Existing gradient points are blended individually. Set `color_mix` in the local config between 0.05 and 0.5 to tune intensity (default 0.22).
-- Snapshots/restores power, brightness, active white temperature or color, gradients, and the active basic effect when exposed by the light. Advanced effect parameters and dynamic-scene playback cannot be reconstructed; pause dynamic scenes first.
-- Restoration runs after ordinary errors and cancellation, with up to three attempts. Power loss, process termination, or persistent network failure can prevent it. A concurrent change in the Hue app during a signal may be overwritten by restoration.
-- OS file locks serialize signals across local stdio/HTTP server processes. A waiting signal times out after 60 seconds.
-- Bridge requests use HTTPS with a private IPv4 address. By default, local Bridge certificate verification is disabled because Hue uses a local certificate. For validated TLS, provide a trusted Bridge CA bundle as `ca_file` in the local configuration. No global TLS settings are changed.
-- Credentials never appear in tool output, URL paths, or committed examples. Protect the local config with your OS user permissions. Other users/processes with access to that file can control the Bridge.
-
-## Test
-
-```powershell
-python -m unittest discover -s tests -v
+```json
+{
+  "bridge_ip": "192.168.1.20",
+  "application_key": "YOUR_LOCAL_BRIDGE_KEY",
+  "light_id": "00000000-0000-0000-0000-000000000001",
+  "color_mix": 0.22
+}
 ```
 
-Tests cover pulse counts/colors, restoration from on/off, write failure, cancellation, restoration retry, rejected unsupported/streaming/dynamic lights, gradients/effects, and serialization. They do not require a real Bridge. CI runs on Windows and Linux.
+Das ist ein Muster, keine nutzbare Zugangskonfiguration. Mit `pair` und `select` die echten Werte erzeugen.
 
-## Create the private GitHub repository
+| Wert | Wirkung |
+| --- | --- |
+| `0.10` | Schwächere Farbverschiebung |
+| `0.22` | Standard |
+| `0.35` | Deutlichere Farbverschiebung |
 
-From a normal PowerShell terminal where your GitHub `git push` works:
+Erlaubt sind `0.05` bis `0.5`. Die Wahrnehmung hängt von Ausgangsfarbe und Leuchte ab. Pulszahl, Zeiten und Zielfarben sind derzeit im Code festgelegt. Die Konfiguration wird pro Werkzeugaufruf neu gelesen. Nach erneutem Pairing optionale Felder prüfen, da diese nicht übernommen werden.
+
+## Grenzen und Sicherheit
+
+- Ein Ziellicht pro Konfigurationsdatei. Der Bridge-Schlüssel selbst hat trotzdem Bridge-weite Berechtigungen; die Anwendung beschränkt ihre MCP-Werkzeuge auf das gewählte Licht.
+- Wiederherstellung erfolgt bestmöglich. Stromausfall, Prozessabbruch, anhaltende Netzwerkfehler und gleichzeitige Änderungen anderer Apps können sie verhindern beziehungsweise überschrieben werden.
+- `restored: true` bedeutet, dass die Wiederherstellungsbefehle ohne gemeldeten API-Fehler angenommen wurden. Der Server liest den Zustand danach nicht zur Bestätigung zurück.
+- Streaming und dynamische Szenen werden abgelehnt. Erweiterte Effektparameter werden nicht vollständig gesichert.
+- Bridge-Zertifikate werden standardmäßig nicht geprüft. Ein passendes CA-Bundle kann als `ca_file` hinterlegt werden; Zertifikatskette und IP-Identität müssen passen. [Details](docs/SECURITY.md)
+- Schnelles Video-/Musik-Sync gehört zur separaten Hue-Entertainment-Streaming-API. [Hue-Hinweise](https://developers.meethue.com/new-hue-api/)
+
+## Tests, Updates und Entfernen
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+Die Tests brauchen keine echte Bridge und verändern kein Licht. Die CI-Datei definiert Windows/Linux und Python 3.11/3.13; lokale Tests belegen keine Ausführung der gesamten Matrix. [Entwicklungsanleitung](docs/DEVELOPMENT.md)
+
+Nach einem Update `pip install -e .` mit dem venv-Interpreter erneut ausführen und Clients neu starten. Lokale Konfiguration erhalten und den Änderungsverlauf prüfen.
+
+Zum Entfernen den MCP-Eintrag und die hinzugefügten Regeln aus den Clients löschen und laufende Server beenden. Danach kann der Projektordner entfernt werden. Bei Bedarf die Bridge-Autorisierung zusätzlich über eine geeignete Bridge-Verwaltung widerrufen. Nur die lokale Datei zu löschen widerruft den Schlüssel nicht.
+
+## Optional: privates GitHub-Repository
+
+GitHub ist zum Betrieb nicht erforderlich. Zum Erstellen und Pushen eines privaten Repositorys gibt es ein optionales Skript:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\Publish-PrivateRepo.ps1
 ```
 
-The script reuses Git's configured credential helper, creates `hue-task-mcp` under the authenticated GitHub account with `private: true`, stages an explicit source-file allowlist, and pushes `main`. It refuses an existing public repo, a mismatched remote, or tracked credentials. It never force-pushes and never prints or persists the GitHub token.
+Es verwendet den Git-Credential-Helper und das authentifizierte persönliche GitHub-Konto. Optional: `-GitHubUsername DEIN_LOGIN` bei mehreren Konten und `-RepositoryName NAME` für einen anderen Namen. Ein funktionierender Git-Push garantiert nicht, dass der gespeicherte Token auch Repositorys per API erstellen darf.
+
+Das Skript verweigert öffentliche Zielrepositorys, abweichende Remotes und getrackte Standard-Konfigurationsdateien; es pusht ohne Force. Es berücksichtigt die Dokumentation. Vor dem Push `git status` und `git diff --cached` prüfen. Keine lokalen Schlüssel oder Logdateien hochladen.
+
+Eine Weitergabe-Lizenz wurde noch nicht festgelegt. Vor einer öffentlichen Veröffentlichung die gewünschte Lizenz ausdrücklich auswählen.

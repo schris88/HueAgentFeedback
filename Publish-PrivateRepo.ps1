@@ -1,11 +1,19 @@
-param([string]$RepositoryName = 'hue-task-mcp')
+param(
+    [string]$RepositoryName = 'hue-task-mcp',
+    [string]$GitHubUsername = ''
+)
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 if ($RepositoryName -notmatch '^[a-zA-Z0-9_.-]+$') { throw 'Invalid repository name' }
 
 # Ask the same Git credential helper used by ordinary git pull / git push.
 # Credentials stay in memory and are never printed or written into this repo.
-$credentialLines = "protocol=https`nhost=github.com`nusername=schris88`n`n" | git credential fill
+$credentialQuery = "protocol=https`nhost=github.com`n"
+if ($GitHubUsername) {
+    if ($GitHubUsername -notmatch '^[a-zA-Z0-9-]+$') { throw 'Invalid GitHub username' }
+    $credentialQuery += "username=$GitHubUsername`n"
+}
+$credentialLines = ($credentialQuery + "`n") | git credential fill
 if ($LASTEXITCODE -ne 0) { throw 'Git credential helper failed. Run this in your normal authenticated terminal.' }
 $credential = @{}
 foreach ($line in $credentialLines) {
@@ -30,7 +38,7 @@ try {
     if (-not (Test-Path -LiteralPath '.git')) { git init -b main; if ($LASTEXITCODE -ne 0) { throw 'git init failed' } }
     $trackedSecrets = git ls-files -- '*.local.json' '.env'
     if ($trackedSecrets) { throw 'A local credentials file is tracked. Refusing to publish.' }
-    git add -- .github .gitignore pyproject.toml README.md hue_task_mcp tests examples Publish-PrivateRepo.ps1
+    git add -- .github .gitignore pyproject.toml README.md CHANGELOG.md docs hue_task_mcp tests examples Publish-PrivateRepo.ps1
     if ($LASTEXITCODE -ne 0) { throw 'git add failed' }
     git diff --cached --quiet
     if ($LASTEXITCODE -eq 1) { git commit -m 'Add tested Hue MCP task indicators'; if ($LASTEXITCODE -ne 0) { throw 'git commit failed' } }

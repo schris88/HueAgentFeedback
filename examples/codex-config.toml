@@ -1,0 +1,7 @@
+# Merge into the existing config and replace these example paths.
+[mcp_servers.hue-task]
+command = 'C:/PATH/TO/hue-task-mcp/.venv/Scripts/python.exe'
+args = ["-m", "hue_task_mcp", "serve"]
+cwd = 'C:/PATH/TO/hue-task-mcp'
+startup_timeout_sec = 20
+tool_timeout_sec = 60
