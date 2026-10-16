@@ -44,23 +44,21 @@ Aufruf: `python -m hue_task_mcp [--config PATH] BEFEHL`. Nach der Paketinstallat
 | `pair` | `--bridge IP` | Neue Bridge-Autorisierung über physischen Tastendruck erstellen |
 | `lights` | Keine | Pro Leuchte eine JSON-Zeile: UUID, Name, Farbe, Gradient, Modus |
 | `select` | `LIGHT_UUID` | Farbfähigkeit prüfen und Ziel-UUID speichern |
+| `status` | Keine | Zustand und Fähigkeiten der ausgewählten Leuchte anzeigen |
 | `signal` | `done` oder `question` | Ein Signal ausführen und Ergebnis ausgeben |
-| `serve` | `--transport stdio` oder `streamable-http`, optional `--port` | MCP-Server starten |
 | `hook` | `Stop`, `PreToolUse`, `done` oder `question` | Antigravity Lifecycle Hook Handler (signalisiert und gibt `{"decision": "allow"}` aus) |
 | `setup` | Optional `--global`, `--path PATH`, `--uninstall` | Automatische Einrichtung der `hooks.json` für Antigravity CLI |
 
-`serve` verwendet standardmäßig stdio. `--port` gilt nur für HTTP, Standard `8765`. HTTP bindet fest an `127.0.0.1`, Pfad `/mcp`; es gibt keinen `--host`-Parameter. Erfolgreiche einmalige Befehle enden mit Status 0. Abgefangene Konfigurations-/Bridge-Fehler enden mit Status 1. Nicht alle Betriebssystem- und Bibliotheksfehler werden in kurze CLI-Meldungen umgewandelt.
+Erfolgreiche einmalige Befehle enden mit Status 0. Abgefangene Konfigurations-/Bridge-Fehler enden mit Status 1. Nicht alle Betriebssystem- und Bibliotheksfehler werden in kurze CLI-Meldungen umgewandelt.
 
 `setup` richtet Antigravity Lifecycle Hooks in `.agents/hooks.json` (lokal) oder mit `--global` in `%USERPROFILE%\.gemini\config\hooks.json` ein. Dadurch werden `Stop` (Aufgabe beendet -> Blau) und `PreToolUse` (Rückfrage via `ask_question` -> Rot) deterministisch auf Systemebene ausgelöst, ohne dass LLM-Regeln erforderlich sind.
 
-## MCP-Werkzeuge
+## Signale und Verhalten
 
-Alle Werkzeuge haben **keine Eingabeparameter**. Bridge-IP, Schlüssel, Licht und Intensität stammen ausschließlich aus der lokalen Datei. Der Agent kann kein beliebiges Ziellicht anfordern.
+Alle Signale beziehen sich ausschließlich auf die in der lokalen Konfigurationsdatei ausgewählte Leuchte.
 
-### `task_done`
-
-Genau einmal unmittelbar vor der Abschlussantwort für eine erfolgreich abgeschlossene Aufgabe aufrufen. Typisches Nutzdatenergebnis:
-
+### Signal `done` (`Stop`)
+Zweimal langsam sanftes Blau einmischen. Typisches Ergebnis:
 ```json
 {
   "event": "done",
@@ -71,23 +69,20 @@ Genau einmal unmittelbar vor der Abschlussantwort für eine erfolgreich abgeschl
 }
 ```
 
-### `needs_input`
+### Signal `question` (`PreToolUse: ask_question`)
+Zweimal langsam sanftes Rot einmischen. Dasselbe Ergebnisschema mit `event: "question"` und `pattern: "red_color_blend"`.
 
-Genau einmal unmittelbar vor einer Frage aufrufen, für die eine Nutzerantwort erforderlich ist. Dasselbe Ergebnisschema mit `event: "question"` und `pattern: "red_color_blend"`.
-
-Bei ausgeschaltetem Licht liefern beide Werkzeuge stattdessen:
-
+### Verhalten bei ausgeschaltetem Licht
+Ist die Leuchte ausgeschaltet, wird **kein** Befehl an die Bridge gesendet:
 ```json
 {"event": "question", "skipped": true, "reason": "light_is_off"}
 ```
+Die Aus-Prüfung erfolgt sofort zu Beginn. Eine ausgeschaltete Leuchte wird niemals unerwünscht eingeschaltet oder farblich verändert.
 
-Farb-, Streaming- und Szenenprüfungen erfolgen vor der Aus-Prüfung. Eine ausgeschaltete Leuchte kann deshalb bei einem unzulässigen Modus trotzdem einen Fehler melden.
+`restored: true` bestätigt angenommene Wiederherstellungsbefehle.
 
-`restored: true` bestätigt angenommene Wiederherstellungsbefehle, keine zusätzliche Messung des endgültigen physischen Zustands. Die MCP-SDK-Version bestimmt den äußeren Content-/Fehler-Envelope; oben steht nur das fachliche Nutzdatenergebnis.
-
-### `light_status`
-
-Liest die ausgewählte Leuchte ohne Lichtänderung. Rückgabefelder: `name`, `state` mit `on`, `mode`, `color`, `brightness`, `temperature`, `gradient`, `effects`. Die letzten drei Fähigkeitsfelder und die Effektliste hängen von der Bridge-Antwort ab. Ohne ausgewähltes Licht: `{"paired": true, "light_selected": false}`. Ohne Pairing-Konfiguration wird ein Fehler gemeldet; der Server bietet keinen anonymen Hardwarestatus.
+### Status (`status`)
+Liest die ausgewählte Leuchte ohne Lichtänderung. Rückgabefelder: `name`, `state` mit `on`, `mode`, `color`, `brightness`, `temperature`, `gradient`, `effects`. Ohne ausgewähltes Licht: `{"paired": true, "light_selected": false}`.
 
 ## Feste Signalparameter
 

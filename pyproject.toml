@@ -3,12 +3,12 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hue-task-mcp"
-version = "0.1.0"
-description = "Ambient Philips Hue light feedback for AI agents (Antigravity CLI hooks & MCP)"
+name = "HueAgentFeedback"
+version = "0.2.0"
+description = "Ambient Philips Hue light feedback for AI coding agents via lifecycle hooks"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["mcp>=2.2,<3"]
+dependencies = []
 
 [project.scripts]
 hue-agent-feedback = "hue_task_mcp.cli:main"

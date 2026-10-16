@@ -27,41 +27,6 @@ def save_config(path, config):
         path.chmod(0o600)
 
 
-def make_server(config_path):
-    from mcp.server import MCPServer
-    from .locking import file_lock
-    server = MCPServer("hue-task-mcp", version="0.1.0", instructions=(
-        "Call task_done once immediately before the final answer for a completed task (two gentle blue color blends). "
-        "Call needs_input once immediately before asking a question that requires the user's response. "
-        "Never signal completion for an incomplete task. Do not signal routine progress updates."))
-    # Read configuration for every call so pairing/selection does not need a restart.
-    def indicator():
-        return Indicator(Bridge(load_config(config_path)), config_path.with_suffix(".lock"))
-
-    @server.tool()
-    async def task_done() -> dict:
-        """Ease a little blue into the current color twice, preserving brightness, then restore. Call before the final answer when the task is complete."""
-        return await indicator().signal("done")
-
-    @server.tool()
-    async def needs_input() -> dict:
-        """Ease a little red into the current color twice, preserving brightness, then restore. Skip when off. Call immediately before asking the user a question requiring a reply."""
-        return await indicator().signal("question")
-
-    @server.tool()
-    async def light_status() -> dict:
-        """Read the configured monitor light's state and supported capabilities. Makes no lighting changes."""
-        bridge = Bridge(load_config(config_path))
-        if not bridge.config.get("light_id"):
-            return {"paired": True, "light_selected": False}
-        light = await bridge.light(bridge.config["light_id"])
-        return {"name": light.get("metadata", {}).get("name"), "state": light.get("on"),
-                "mode": light.get("mode"), "color": "color" in light,
-                "brightness": light.get("dimming", {}).get("brightness"),
-                "temperature": "color_temperature" in light,
-                "gradient": "gradient" in light,
-                "effects": light.get("effects", {}).get("effect_values", [])}
-    return server
 
 
 async def local_action(args):
@@ -108,6 +73,21 @@ async def local_action(args):
             print("Selected: " + light.get("metadata", {}).get("name", light["id"]))
         elif args.command == "signal":
             print(json.dumps(await Indicator(bridge, path.with_suffix(".lock")).signal(args.event)))
+        elif args.command == "status":
+            if not bridge.config.get("light_id"):
+                print(json.dumps({"paired": True, "light_selected": False}))
+            else:
+                light = await bridge.light(bridge.config["light_id"])
+                print(json.dumps({
+                    "name": light.get("metadata", {}).get("name"),
+                    "state": light.get("on"),
+                    "mode": light.get("mode"),
+                    "color": "color" in light,
+                    "brightness": light.get("dimming", {}).get("brightness"),
+                    "temperature": "color_temperature" in light,
+                    "gradient": "gradient" in light,
+                    "effects": light.get("effects", {}).get("effect_values", [])
+                }, indent=2))
 
 
 async def run_hook(args):
@@ -195,20 +175,18 @@ def run_setup(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Philips Hue MCP task indicators")
+    parser = argparse.ArgumentParser(description="Philips Hue agent indicators and lifecycle hooks")
     parser.add_argument("--config", type=Path, default=Path(os.getenv("HUE_TASK_CONFIG", DEFAULT_CONFIG)))
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("discover")
-    pair = sub.add_parser("pair")
-    pair.add_argument("--bridge", required=True)
-    sub.add_parser("lights")
-    select = sub.add_parser("select")
-    select.add_argument("light_id")
-    signal = sub.add_parser("signal")
+    sub.add_parser("discover", help="Discover Hue Bridges on the local network")
+    pair = sub.add_parser("pair", help="Pair with a Hue Bridge")
+    pair.add_argument("--bridge", required=True, help="Bridge IP address")
+    sub.add_parser("lights", help="List available color-capable lights")
+    select = sub.add_parser("select", help="Select target monitor light by UUID")
+    select.add_argument("light_id", help="Light UUID")
+    signal = sub.add_parser("signal", help="Trigger a signal manually")
     signal.add_argument("event", choices=["done", "question"])
-    serve = sub.add_parser("serve")
-    serve.add_argument("--transport", choices=["stdio", "streamable-http"], default="stdio")
-    serve.add_argument("--port", type=int, default=8765)
+    sub.add_parser("status", help="Show current state of selected light")
     hook = sub.add_parser("hook", help="Handle Antigravity lifecycle events")
     hook.add_argument("event", choices=["Stop", "stop", "PreToolUse", "pre_tool_use", "done", "question"])
     setup = sub.add_parser("setup", help="Configure Antigravity CLI lifecycle hooks")
@@ -217,14 +195,7 @@ def main():
     setup.add_argument("--uninstall", action="store_true", help="Remove hue-task hooks from target file")
     args = parser.parse_args()
     try:
-        if args.command == "serve":
-            server = make_server(args.config.resolve())
-            if args.transport == "stdio":
-                server.run()
-            else:
-                server.run(transport="streamable-http", host="127.0.0.1", port=args.port,
-                           stateless_http=True, json_response=True)
-        elif args.command == "hook":
+        if args.command == "hook":
             asyncio.run(run_hook(args))
         elif args.command == "setup":
             run_setup(args)

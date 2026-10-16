@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "python -m hue_task_mcp signal done"
+      }
+    ],
+    "Notification": [
+      {
+        "type": "command",
+        "command": "python -m hue_task_mcp signal question"
+      }
+    ]
+  }
+}
