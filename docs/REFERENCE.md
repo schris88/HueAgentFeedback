@@ -46,12 +46,12 @@ Aufruf: `hue-agent-feedback [--config PATH] BEFEHL` (oder `python -m hue_agent_f
 | `select` | `LIGHT_UUID` | Farbfähigkeit prüfen und Ziel-UUID speichern |
 | `status` | Keine | Zustand und Fähigkeiten der ausgewählten Leuchte anzeigen |
 | `signal` | `done` oder `question` | Ein Signal ausführen und Ergebnis ausgeben |
-| `hook` | `Stop`, `PreToolUse`, `done` oder `question` | Antigravity Lifecycle Hook Handler (signalisiert und gibt `{"decision": "allow"}` aus) |
+| `hook` | `Stop`, `PreToolUse`, `done` oder `question` (optional `--sync`) | Antigravity Lifecycle Hook Handler (signalisiert im Hintergrund und gibt sofort `{"decision": "allow"}` aus, sodass der Agent ohne Verzögerung abschließt; `--sync` wartet das Signal ab) |
 | `setup` | Optional `--global`, `--path PATH`, `--uninstall` | Automatische Einrichtung der `hooks.json` für Antigravity CLI |
 
 Erfolgreiche einmalige Befehle enden mit Status 0. Abgefangene Konfigurations-/Bridge-Fehler enden mit Status 1. Nicht alle Betriebssystem- und Bibliotheksfehler werden in kurze CLI-Meldungen umgewandelt.
 
-`setup` richtet Antigravity Lifecycle Hooks in `.agents/hooks.json` (lokal) oder mit `--global` in `%USERPROFILE%\.gemini\config\hooks.json` ein. Dadurch werden `Stop` (Aufgabe beendet -> Blau) und `PreToolUse` (Rückfrage via `ask_question` -> Rot) deterministisch auf Systemebene ausgelöst, ohne dass LLM-Regeln erforderlich sind.
+`setup` richtet Antigravity Lifecycle Hooks in `.agents/hooks.json` (lokal) oder mit `--global` in `%USERPROFILE%\.gemini\config\hooks.json` ein. Dadurch werden `Stop` (Aufgabe beendet -> Blau) und `PreToolUse` (Rückfrage via `ask_question` -> Rot) deterministisch auf Systemebene ausgelöst, ohne dass LLM-Regeln erforderlich sind. Hook-Aufrufe laufen standardmäßig non-blocking im Hintergrund ab, damit der Chat zeitgleich abschließt und nicht durch die Signaldauer verzögert wird.
 
 ## Signale und Verhalten
 

@@ -2,10 +2,18 @@ import io
 import json
 import tempfile
 import unittest
+import os
+import subprocess
 from pathlib import Path
 from unittest.mock import patch, AsyncMock
 
-from hue_agent_feedback.cli import generate_hook_config, run_setup, run_hook
+from hue_agent_feedback.cli import (
+    generate_hook_config,
+    run_setup,
+    run_hook,
+    resolve_hook_python_executable,
+    spawn_detached_signal
+)
 
 
 class HookCliTests(unittest.TestCase):
@@ -55,12 +63,35 @@ class HookCliTests(unittest.TestCase):
         data = json.loads(target.read_text(encoding="utf-8"))
         self.assertNotIn("hue-agent-feedback", data)
 
+    def test_resolve_hook_python_executable_prefers_pythonw_on_windows(self):
+        py_bin = self.dir_path / "python.exe"
+        pyw_bin = self.dir_path / "pythonw.exe"
+        py_bin.touch()
+        pyw_bin.touch()
+
+        with patch("os.name", "nt"):
+            resolved = resolve_hook_python_executable(py_bin)
+            self.assertEqual(resolved, pyw_bin)
+
+    def test_spawn_detached_signal_flags(self):
+        with patch("subprocess.Popen") as mock_popen:
+            spawn_detached_signal(Path("test.json"), "done")
+            mock_popen.assert_called_once()
+            _, kwargs = mock_popen.call_args
+            self.assertTrue(kwargs.get("close_fds"))
+            if os.name == "nt":
+                flags = kwargs.get("creationflags", 0)
+                self.assertTrue(flags & subprocess.DETACHED_PROCESS)
+                self.assertTrue(flags & subprocess.CREATE_NEW_PROCESS_GROUP)
+                self.assertTrue(flags & getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000))
+
 
 class RunHookTests(unittest.IsolatedAsyncioTestCase):
-    async def test_run_hook_stop_emits_allow_and_signals(self):
+    async def test_run_hook_stop_emits_allow_and_signals_sync(self):
         class Args:
             event = "Stop"
             config = Path("hue.local.json")
+            sync = True
 
         with patch("hue_agent_feedback.cli.Bridge") as mock_bridge, \
              patch("hue_agent_feedback.cli.Indicator") as mock_indicator, \
@@ -75,10 +106,11 @@ class RunHookTests(unittest.IsolatedAsyncioTestCase):
             output = json.loads(mock_stdout.getvalue())
             self.assertEqual(output.get("decision"), "allow")
 
-    async def test_run_hook_pre_tool_use_with_ask_question(self):
+    async def test_run_hook_pre_tool_use_with_ask_question_sync(self):
         class Args:
             event = "PreToolUse"
             config = Path("hue.local.json")
+            sync = True
 
         payload = {"toolCall": {"name": "ask_question", "args": {}}}
         with patch("hue_agent_feedback.cli.Bridge") as mock_bridge, \
@@ -95,10 +127,26 @@ class RunHookTests(unittest.IsolatedAsyncioTestCase):
             output = json.loads(mock_stdout.getvalue())
             self.assertEqual(output.get("decision"), "allow")
 
+    async def test_run_hook_detached_default(self):
+        class Args:
+            event = "Stop"
+            config = Path("hue.local.json")
+            sync = False
+
+        with patch("hue_agent_feedback.cli.load_config", return_value={"light_id": "123"}), \
+             patch("hue_agent_feedback.cli.spawn_detached_signal") as mock_spawn, \
+             patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+            await run_hook(Args)
+
+            mock_spawn.assert_called_once_with(Path("hue.local.json").resolve(), "done")
+            output = json.loads(mock_stdout.getvalue())
+            self.assertEqual(output.get("decision"), "allow")
+
     async def test_run_hook_error_resilience(self):
         class Args:
             event = "Stop"
             config = Path("nonexistent.json")
+            sync = True
 
         with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout, \
              patch("sys.stderr", new_callable=io.StringIO) as mock_stderr:

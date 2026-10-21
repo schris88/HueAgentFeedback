@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 0.2.1 — Lautlose Hintergrundausführung unter Windows
+
+- Unter Windows wird für Hooks nun automatisch `pythonw.exe` statt `python.exe` konfiguriert.
+- Dadurch öffnet sich bei Hook-Aufrufen (`Stop`, `PreToolUse`) kein CMD- oder Terminal-Fenster mehr im Vordergrund.
+- Hintergrund-Signale nutzen `CREATE_NO_WINDOW` und `close_fds=True`, wodurch Hooks sofort (~100 ms) ohne Blockieren oder Fensterbildung zurückkehren.
+
 ## 0.2.0 — HueAgentFeedback (Lifecycle Hooks)
 
 - Projekt umbenannt in **HueAgentFeedback** (`hue-agent-feedback`).

@@ -90,6 +90,41 @@ async def local_action(args):
                 }, indent=2))
 
 
+def resolve_hook_python_executable(python_path: Path | None = None) -> Path:
+    py_path = python_path if python_path is not None else Path(sys.executable)
+    if os.name == "nt":
+        pyw = py_path.with_name("pythonw.exe")
+        if pyw.exists():
+            return pyw
+    return py_path
+
+
+def spawn_detached_signal(config_path: Path, signal_type: str):
+    import subprocess
+    py_exec = sys.executable
+    kwargs = {}
+    if os.name == "nt":
+        pyw = Path(py_exec).with_name("pythonw.exe")
+        if pyw.exists():
+            py_exec = str(pyw)
+        kwargs["creationflags"] = (
+            subprocess.DETACHED_PROCESS
+            | subprocess.CREATE_NEW_PROCESS_GROUP
+            | getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        )
+    else:
+        kwargs["start_new_session"] = True
+
+    subprocess.Popen(
+        [py_exec, "-m", "hue_agent_feedback", "--config", str(config_path), "signal", signal_type],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+        close_fds=True,
+        **kwargs
+    )
+
+
 async def run_hook(args):
     event = args.event
     path = args.config.resolve()
@@ -102,17 +137,29 @@ async def run_hook(args):
 
     if signal_type:
         try:
-            bridge = Bridge(load_config(path))
-            await Indicator(bridge, path.with_suffix(".lock")).signal(signal_type)
+            cfg = load_config(path)
+            if cfg.get("light_id"):
+                if getattr(args, "sync", False):
+                    bridge = Bridge(cfg)
+                    await Indicator(bridge, path.with_suffix(".lock")).signal(signal_type)
+                else:
+                    spawn_detached_signal(path, signal_type)
         except Exception as exc:
-            sys.stderr.write(f"[hue-agent-feedback] Hook signal error: {exc}\n")
+            if sys.stderr is not None:
+                sys.stderr.write(f"[hue-agent-feedback] Hook signal error: {exc}\n")
 
     # Antigravity hook contract: Always emit JSON on stdout
-    print(json.dumps({"decision": "allow"}))
+    if sys.stdout is not None:
+        print(json.dumps({"decision": "allow"}))
+        try:
+            sys.stdout.flush()
+        except Exception:
+            pass
 
 
 def generate_hook_config(python_path: Path, config_path: Path) -> dict:
-    py_exec = python_path.resolve().as_posix()
+    resolved_py = resolve_hook_python_executable(python_path)
+    py_exec = resolved_py.resolve().as_posix()
     cfg_posix = config_path.resolve().as_posix()
     py_str = f'"{py_exec}"' if " " in py_exec else py_exec
     cfg_str = f'"{cfg_posix}"' if " " in cfg_posix else cfg_posix
@@ -197,6 +244,7 @@ def main():
     sub.add_parser("status", help="Show current state of selected light")
     hook = sub.add_parser("hook", help="Handle Antigravity lifecycle events")
     hook.add_argument("event", choices=["Stop", "stop", "PreToolUse", "pre_tool_use", "done", "question"])
+    hook.add_argument("--sync", action="store_true", help="Run signal synchronously instead of detached in background")
     setup = sub.add_parser("setup", help="Configure Antigravity CLI lifecycle hooks")
     setup.add_argument("--global", dest="is_global", action="store_true", help="Install hooks globally in ~/.gemini/config/hooks.json")
     setup.add_argument("--path", type=Path, default=None, help="Target hooks.json path")
